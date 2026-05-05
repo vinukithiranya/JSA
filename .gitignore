@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+.env
+backend/.venv
+storage
+frontend/node_modules
+frontend/dist
+backend/rigpro.db
+frontend/tsconfig.tsbuildinfo
+tmp

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font-family: sans-serif; color: #1a1a1a; }
+    h1, h2 { margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th, td { border: 1px solid #d9d9d9; padding: 8px; text-align: left; }
+    th { background: #f4f8f3; }
+  </style>
+</head>
+<body>
+  <h1>RigPro Job Safety Assessment</h1>
+  <h2>Job Details</h2>
+  <table>
+    <tr><th>Job Number</th><td>{{ job_number }}</td></tr>
+    <tr><th>Boat</th><td>{{ boat_name }}</td></tr>
+    <tr><th>Service Log</th><td>{{ service_log_number }}</td></tr>
+    <tr><th>Location</th><td>{{ location }}</td></tr>
+    <tr><th>Status</th><td>{{ status }}</td></tr>
+  </table>
+  <h2>Hazards</h2>
+  <table>
+    <tr><th>Hazard</th><th>Controls</th><th>Pre</th><th>Post</th></tr>
+    {% for h in hazards %}
+    <tr>
+      <td>{{ h.hazard_name }}</td>
+      <td>{{ h.controls }}</td>
+      <td>{{ h.pre_score }}</td>
+      <td>{{ h.post_score }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>
