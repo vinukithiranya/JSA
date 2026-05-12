@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import AppShell from "../components/AppShell";
+import Layout from "../components/Layout";
 import { api } from "../api";
 import type { DocumentItem, User } from "../types";
 
-type Props = { user: User };
+type Props = { user: User | null; onLogout: () => void };
 
-export default function DocumentsPage({ user }: Props) {
+export default function DocumentsPage({ user, onLogout }: Props) {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState("SOP");
@@ -38,7 +38,7 @@ export default function DocumentsPage({ user }: Props) {
   }
 
   return (
-    <AppShell user={user} title="Document Library">
+    <Layout user={user} title="Documents Library" onLogout={onLogout}>
       <div className="grid gap-4 md:grid-cols-3">
         <section className="glass-card rounded-2xl p-5 shadow-card md:col-span-1">
           <h2 className="mb-3 font-display text-xl text-brand-900">Upload Document</h2>
@@ -64,6 +64,6 @@ export default function DocumentsPage({ user }: Props) {
           </div>
         </section>
       </div>
-    </AppShell>
+    </Layout>
   );
 }

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, responses
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -164,3 +164,5 @@ def get_summary(jsa_id: str, db: Session = Depends(get_db)):
         tb = traceback.format_exc()
         (log_dir / f"summary_error_{jsa_id}.log").write_text(tb, encoding="utf-8")
         raise
+
+

@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import AppShell from "../components/AppShell";
+import Layout from "../components/Layout";
 import { api } from "../api";
 import type { FormTemplate, User } from "../types";
 
-type Props = { user: User };
+type Props = { user: User | null; onLogout: () => void };
 
 type FieldType = "text" | "number" | "date" | "dropdown" | "checkbox" | "signature";
 
-export default function FormBuilderPage({ user }: Props) {
+export default function FormBuilderPage({ user, onLogout }: Props) {
   const [name, setName] = useState("Vessel Inspection Checklist");
   const [category, setCategory] = useState("Inspection");
   const [description, setDescription] = useState("Custom checklist for vessel inspection.");
@@ -44,7 +44,7 @@ export default function FormBuilderPage({ user }: Props) {
   }
 
   return (
-    <AppShell user={user} title="Form Builder">
+    <Layout user={user} title="Form Builder" onLogout={onLogout}>
       <div className="grid gap-4 md:grid-cols-2">
         <section className="glass-card rounded-2xl p-5 shadow-card">
           <h2 className="mb-3 font-display text-xl text-brand-900">Create Custom Form</h2>
@@ -128,6 +128,6 @@ export default function FormBuilderPage({ user }: Props) {
           </div>
         </section>
       </div>
-    </AppShell>
+    </Layout>
   );
 }

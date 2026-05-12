@@ -1,63 +1,131 @@
-import { Link, useLocation } from "react-router-dom";
-import type { ReactNode } from "react";
-import type { User } from "../types";
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import DashboardPage from '../pages/DashboardPage';
+import LoginPage from '../pages/LoginPage';
+import JsaWizardPage from '../pages/JsaWizardPage';
+import ReviewPage from '../pages/ReviewPage';
+import SupervisorPage from '../pages/SupervisorPage';
+import FormBuilderPage from '../pages/FormBuilderPage';
+import DocumentsPage from '../pages/DocumentsPage';
+import SyncPage from '../pages/SyncPage';
+import { User } from '../types';
 
-type Props = {
-  user: User;
-  title: string;
-  children: ReactNode;
-  onLogout?: () => void;
+const AppShell = () => {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // On mount, try to restore user from localStorage or load from API
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Try to load user data from localStorage
+            const userData = localStorage.getItem('user');
+            if (userData) {
+                setUser(JSON.parse(userData));
+            }
+        }
+        setLoading(false);
+    }, []);
+
+    const handleLogin = (userData: User, token: string) => {
+        setUser(userData);
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(userData));
+    };
+
+    const handleLogout = () => {
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+    };
+
+    if (loading) {
+        return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
+    }
+
+    const isAuthenticated = !!user || localStorage.getItem('token');
+
+    return (
+        <Router>
+            <Routes>
+                <Route
+                    path="/"
+                    element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/login" />}
+                />
+                <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+                <Route
+                    path="/dashboard"
+                    element={
+                        isAuthenticated ? (
+                            <DashboardPage user={user} onLogout={handleLogout} />
+                        ) : (
+                            <Navigate to="/login" />
+                        )
+                    }
+                />
+                <Route
+                    path="/jsa/new"
+                    element={
+                        isAuthenticated ? (
+                            <JsaWizardPage user={user} onLogout={handleLogout} />
+                        ) : (
+                            <Navigate to="/login" />
+                        )
+                    }
+                />
+                <Route
+                    path="/jsa/:id/review"
+                    element={
+                        isAuthenticated ? (
+                            <ReviewPage user={user} onLogout={handleLogout} />
+                        ) : (
+                            <Navigate to="/login" />
+                        )
+                    }
+                />
+                <Route
+                    path="/supervisor"
+                    element={
+                        isAuthenticated ? (
+                            <SupervisorPage user={user} onLogout={handleLogout} />
+                        ) : (
+                            <Navigate to="/login" />
+                        )
+                    }
+                />
+                <Route
+                    path="/forms"
+                    element={
+                        isAuthenticated ? (
+                            <FormBuilderPage user={user} onLogout={handleLogout} />
+                        ) : (
+                            <Navigate to="/login" />
+                        )
+                    }
+                />
+                <Route
+                    path="/documents"
+                    element={
+                        isAuthenticated ? (
+                            <DocumentsPage user={user} onLogout={handleLogout} />
+                        ) : (
+                            <Navigate to="/login" />
+                        )
+                    }
+                />
+                <Route
+                    path="/sync"
+                    element={
+                        isAuthenticated ? (
+                            <SyncPage user={user} onLogout={handleLogout} />
+                        ) : (
+                            <Navigate to="/login" />
+                        )
+                    }
+                />
+            </Routes>
+        </Router>
+    );
 };
 
-export default function AppShell({ user, title, children, onLogout }: Props) {
-  const location = useLocation();
-
-  const links = [
-    { to: "/dashboard", label: "Dashboard" },
-    { to: "/jsa/new", label: "Create JSA" },
-    { to: "/supervisor", label: "Supervisor" },
-    { to: "/forms", label: "Form Builder" },
-    { to: "/documents", label: "Documents" },
-    { to: "/sync", label: "Offline Sync" },
-  ];
-
-  return (
-    <div className="page-bg min-h-screen p-4 md:p-8">
-      <div className="mx-auto max-w-7xl">
-        <header className="glass-card mb-6 flex flex-col gap-4 rounded-3xl p-5 shadow-card md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="font-display text-sm uppercase tracking-[0.18em] text-brand-700">RigPro Safety</p>
-            <h1 className="font-display text-2xl text-brand-900">{title}</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="rounded-2xl bg-brand-50 px-4 py-2 text-right">
-              <p className="text-sm text-brand-700">{user.role}</p>
-              <p className="font-semibold text-brand-900">{user.full_name}</p>
-            </div>
-            {onLogout ? (
-              <button onClick={onLogout} className="rounded-xl bg-brand-700 px-4 py-2 font-semibold text-white hover:bg-brand-800">
-                Logout
-              </button>
-            ) : null}
-          </div>
-        </header>
-
-        <nav className="glass-card mb-6 flex flex-wrap gap-2 rounded-2xl p-3 shadow-card">
-          {links.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                location.pathname === item.to ? "bg-brand-700 text-white" : "bg-white text-brand-800 hover:bg-brand-100"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        {children}
-      </div>
-    </div>
-  );
-}
+export default AppShell;

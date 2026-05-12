@@ -1,15 +1,15 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import AppShell from "../components/AppShell";
+import Layout from "../components/Layout";
 import { api } from "../api";
 import { enqueueOfflineJsa } from "../offlineQueue";
 import type { JsaRecord, User } from "../types";
 
-type Props = { user: User };
+type Props = { user: User | null; onLogout: () => void };
 
 const QUESTIONS = Array.from({ length: 25 }, (_, i) => ({ id: `q${i + 1}`, label: `Safety question ${i + 1}` }));
 
-export default function JsaWizardPage({ user }: Props) {
+export default function JsaWizardPage({ user, onLogout }: Props) {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
 
@@ -98,7 +98,7 @@ export default function JsaWizardPage({ user }: Props) {
   }
 
   return (
-    <AppShell user={user} title="Create New JSA">
+    <Layout user={user} title="Create New JSA" onLogout={onLogout}>
       <div className="glass-card rounded-3xl p-6 shadow-card">
         <p className="mb-4 text-sm text-brand-700">Step {step} of 4</p>
         {message ? <p className="mb-4 rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-800">{message}</p> : null}
@@ -168,7 +168,7 @@ export default function JsaWizardPage({ user }: Props) {
           </div>
         ) : null}
       </div>
-    </AppShell>
+    </Layout>
   );
 }
 

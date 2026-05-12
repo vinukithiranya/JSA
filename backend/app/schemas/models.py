@@ -112,3 +112,78 @@ class SyncBatchItem(BaseModel):
 class SyncBatchRequest(BaseModel):
     created_by: str = "u-tech"
     items: list[SyncBatchItem]
+
+
+# Adding schemas for Teams and Team Members
+class TeamCreate(BaseModel):
+    name: str
+    supervisor_id: str
+
+
+class TeamOut(BaseModel):
+    id: str
+    name: str
+    supervisor_id: str
+    created_at: datetime
+
+
+class TeamMemberCreate(BaseModel):
+    team_id: str
+    user_id: str
+    role: Literal["technician", "supervisor"]
+
+
+class TeamMemberOut(BaseModel):
+    id: str
+    team_id: str
+    user_id: str
+    role: str
+    created_at: datetime
+
+
+# Adding schemas for Actions
+class ActionCreate(BaseModel):
+    title: str
+    description: str | None = None
+    assigned_to: str
+
+
+class ActionOut(BaseModel):
+    id: str
+    title: str
+    description: str | None
+    assigned_to: str
+    status: str
+    created_at: datetime
+    updated_at: datetime | None
+
+
+# Adding schemas for Notifications
+class NotificationCreate(BaseModel):
+    user_id: str
+    message: str
+
+
+class NotificationOut(BaseModel):
+    id: str
+    user_id: str
+    message: str
+    is_read: bool
+    created_at: datetime
+
+
+# Adding schemas for Audit Logs
+class AuditLogCreate(BaseModel):
+    user_id: str
+    action: str
+    resource: str
+    details: dict | None = None
+
+
+class AuditLogOut(BaseModel):
+    id: str
+    user_id: str
+    action: str
+    resource: str
+    timestamp: datetime
+    details: dict | None

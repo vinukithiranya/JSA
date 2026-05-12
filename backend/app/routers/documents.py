@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -52,3 +52,25 @@ async def upload_document(
     db.refresh(record)
 
     return to_document_out(record)
+
+
+@router.patch("/{document_id}/update-version", response_model=DocumentOut)
+def update_document_version(document_id: str, db: Session = Depends(get_db)):
+    document = db.query(DocumentDB).filter(DocumentDB.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    document.version += 1
+    db.commit()
+    db.refresh(document)
+    return document
+
+
+@router.patch("/{document_id}/add-tags", response_model=DocumentOut)
+def add_document_tags(document_id: str, tags: list[str], db: Session = Depends(get_db)):
+    document = db.query(DocumentDB).filter(DocumentDB.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    document.tags.extend(tags)
+    db.commit()
+    db.refresh(document)
+    return document

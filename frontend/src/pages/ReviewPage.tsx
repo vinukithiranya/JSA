@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import AppShell from "../components/AppShell";
+import Layout from "../components/Layout";
 import { api } from "../api";
 import type { JsaRecord, User } from "../types";
 
-type Props = { user: User };
+type Props = { user: User | null; onLogout: () => void };
 
-export default function ReviewPage({ user }: Props) {
+export default function ReviewPage({ user, onLogout }: Props) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [jsa, setJsa] = useState<JsaRecord | null>(null);
@@ -23,7 +23,7 @@ export default function ReviewPage({ user }: Props) {
   }
 
   return (
-    <AppShell user={user} title="Review and Edit Hazards">
+    <Layout user={user} title="Review and Edit Hazards" onLogout={onLogout}>
       <div className="grid gap-4 md:grid-cols-3">
         <section className="glass-card rounded-2xl p-5 shadow-card md:col-span-2">
           <h2 className="mb-4 font-display text-xl text-brand-900">Detected Hazards</h2>
@@ -56,6 +56,6 @@ export default function ReviewPage({ user }: Props) {
           </div>
         </aside>
       </div>
-    </AppShell>
+    </Layout>
   );
 }

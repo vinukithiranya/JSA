@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import AppShell from "../components/AppShell";
+import Layout from "../components/Layout";
 import { api } from "../api";
 import type { JsaRecord, User } from "../types";
 
-type Props = { user: User };
+type Props = { user: User | null; onLogout: () => void };
 
-export default function SupervisorPage({ user }: Props) {
+export default function SupervisorPage({ user, onLogout }: Props) {
   const [items, setItems] = useState<JsaRecord[]>([]);
 
   async function load() {
@@ -23,7 +23,7 @@ export default function SupervisorPage({ user }: Props) {
   }
 
   return (
-    <AppShell user={user} title="Supervisor Approval Queue">
+    <Layout user={user} title="Supervisor Approval Queue" onLogout={onLogout}>
       <div className="glass-card rounded-2xl p-5 shadow-card">
         <h2 className="mb-4 font-display text-xl text-brand-900">Pending JSAs ({items.length})</h2>
         <div className="space-y-3">
@@ -42,6 +42,6 @@ export default function SupervisorPage({ user }: Props) {
           {items.length === 0 ? <p className="text-brand-700">No pending approvals.</p> : null}
         </div>
       </div>
-    </AppShell>
+    </Layout>
   );
 }

@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import AppShell from "../components/AppShell";
+import Layout from "../components/Layout";
 import { api, type DashboardSummary } from "../api";
 import type { User } from "../types";
 
-type Props = { user: User; onLogout: () => void };
+type Props = { user: User | null; onLogout: () => void };
 
 export default function DashboardPage({ user, onLogout }: Props) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -14,7 +14,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
   }, []);
 
   return (
-    <AppShell user={user} title="Operations Dashboard" onLogout={onLogout}>
+    <Layout user={user} title="Operations Dashboard" onLogout={onLogout}>
       <section className="grid gap-4 md:grid-cols-5">
         <Card title="Total JSAs" value={summary?.kpi.total_jsa ?? 0} />
         <Card title="Pending Approval" value={summary?.kpi.pending_approval ?? 0} />
@@ -46,7 +46,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
           </ul>
         </div>
       </section>
-    </AppShell>
+    </Layout>
   );
 }
 
