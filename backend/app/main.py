@@ -1,22 +1,44 @@
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 
 from app.core.db import Base, SessionLocal, engine
 from app.models import db_models  # noqa: F401
-from app.routers import auth, dashboard, documents, forms, jsa, sync, templates
 from app.routers import analytics, teams, actions, notifications, audit
+from app.routers import auth, dashboard, documents, forms, jsa, sync, templates
+from app.routers import issues, scheduling, inspections
 from app.services.seed import seed_defaults
 
-app = FastAPI(title="RigPro JSA API", version="1.0.0")
+
+def _run_migration(sql: str) -> None:
+    with engine.connect() as conn:
+        try:
+            conn.execute(__import__("sqlalchemy").text(sql))
+            conn.commit()
+        except Exception:
+            pass
 
 
-@app.on_event("startup")
-def on_startup() -> None:
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _run_migration("ALTER TABLE jsa_records ADD COLUMN supervisor_signature TEXT")
+    _run_migration("ALTER TABLE actions ADD COLUMN priority VARCHAR(20) DEFAULT 'medium'")
+    _run_migration("ALTER TABLE actions ADD COLUMN due_date DATE")
+    _run_migration("ALTER TABLE actions ADD COLUMN labels JSON DEFAULT '[]'")
+    _run_migration("ALTER TABLE actions ADD COLUMN action_type VARCHAR(100) DEFAULT 'corrective'")
+    _run_migration("ALTER TABLE actions ADD COLUMN linked_issue_id VARCHAR(64)")
+    _run_migration("ALTER TABLE actions ADD COLUMN linked_jsa_id VARCHAR(64)")
+    _run_migration("ALTER TABLE actions ADD COLUMN created_by VARCHAR(64) DEFAULT 'u-tech'")
     with SessionLocal() as db:
         seed_defaults(db)
+    yield
+
+
+app = FastAPI(title="RigPro JSA API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,5 +66,25 @@ app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(actions.router, prefix="/api/actions", tags=["actions"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
+app.include_router(issues.router, prefix="/api/issues", tags=["issues"])
+app.include_router(scheduling.router, prefix="/api/schedules", tags=["schedules"])
+app.include_router(inspections.router, prefix="/api/inspections", tags=["inspections"])
+
 Path("storage").mkdir(parents=True, exist_ok=True)
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")
+
+# ── Serve built React frontend (production / Docker) ──────────────────────────
+# In local dev the Vite dev server handles the frontend instead.
+_STATIC = Path("static")
+if _STATIC.is_dir():
+    from fastapi.responses import FileResponse as _FileResp
+
+    _assets = _STATIC / "assets"
+    if _assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=_assets), name="vite-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str) -> _FileResp:
+        candidate = _STATIC / full_path
+        target = candidate if candidate.is_file() else _STATIC / "index.html"
+        return _FileResp(str(target))

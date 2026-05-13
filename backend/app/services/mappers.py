@@ -27,6 +27,8 @@ def to_jsa_out(record: JsaRecordDB) -> JsaRecord:
         hazards=hazards,
         ppe_list=record.ppe_list or [],
         created_at=record.created_at,
+        supervisor_signature=record.supervisor_signature,
+        approved_by=record.approved_by,
     )
 
 

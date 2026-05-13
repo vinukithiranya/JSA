@@ -1,4 +1,5 @@
-const API_BASE = "http://localhost:8000";
+// Empty string = same origin (proxied via Vite dev server or Nginx)
+const API_BASE = "";
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem("rigpro_token");
@@ -29,4 +30,18 @@ export type DashboardSummary = {
     avg_risk_score: number;
   };
   status_breakdown: { status: string; count: number }[];
+};
+
+export type IssuesSummary = {
+  total: number;
+  by_status: Record<string, number>;
+  by_type: Record<string, number>;
+  by_priority: Record<string, number>;
+};
+
+export type ActionsSummary = {
+  total: number;
+  overdue: number;
+  by_status: Record<string, number>;
+  by_priority: Record<string, number>;
 };

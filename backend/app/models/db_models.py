@@ -1,6 +1,6 @@
-from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, String, Text, func
+from datetime import date, datetime
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime
 
 from app.core.db import Base
 
@@ -30,7 +30,6 @@ class TemplateDB(Base):
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-# Updating JSA Record model for Draft/Revision workflow
 class JsaRecordDB(Base):
     __tablename__ = "jsa_records"
 
@@ -49,13 +48,13 @@ class JsaRecordDB(Base):
     revision_count: Mapped[int] = mapped_column(Integer, default=0)
     created_by: Mapped[str] = mapped_column(String(64), default="u-tech")
     approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    supervisor_signature: Mapped[str | None] = mapped_column(Text, nullable=True)
     pdf_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_json_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_csv_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-# Updating Document model for versioning and tags
 class DocumentDB(Base):
     __tablename__ = "documents"
 
@@ -73,7 +72,6 @@ class DocumentDB(Base):
     upload_date: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-# Adding Teams and Departments models
 class TeamDB(Base):
     __tablename__ = "teams"
 
@@ -93,20 +91,123 @@ class TeamMemberDB(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-# Adding Actions model
 class ActionDB(Base):
     __tablename__ = "actions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     assigned_to: Mapped[str] = mapped_column(String(64), nullable=False)
-    status: Mapped[str] = mapped_column(String(50), default="pending")
+    status: Mapped[str] = mapped_column(String(50), default="to_do")
+    priority: Mapped[str] = mapped_column(String(20), default="medium")
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    labels: Mapped[list] = mapped_column(JSON, default=[])
+    action_type: Mapped[str] = mapped_column(String(100), default="corrective")
+    linked_issue_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    linked_jsa_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(64), default="u-tech")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
 
-# Adding Notifications model
+class ActionCommentDB(Base):
+    __tablename__ = "action_comments"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    action_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IssueDB(Base):
+    __tablename__ = "issues"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    issue_type: Mapped[str] = mapped_column(String(50), default="hazard")
+    category: Mapped[str] = mapped_column(String(100), default="General")
+    site: Mapped[str] = mapped_column(String(255), default="")
+    priority: Mapped[str] = mapped_column(String(20), default="medium")
+    status: Mapped[str] = mapped_column(String(50), default="open", index=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    media_urls: Mapped[list] = mapped_column(JSON, default=[])
+    custom_answers: Mapped[dict] = mapped_column(JSON, default={})
+    reported_by: Mapped[str] = mapped_column(String(64), default="u-tech")
+    assigned_to: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    linked_jsa_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class IssueCommentDB(Base):
+    __tablename__ = "issue_comments"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    issue_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ScheduleDB(Base):
+    __tablename__ = "schedules"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    template_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    template_name: Mapped[str] = mapped_column(String(255), default="")
+    frequency: Mapped[str] = mapped_column(String(20), default="weekly")
+    frequency_value: Mapped[int] = mapped_column(Integer, default=1)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    site: Mapped[str] = mapped_column(String(255), default="")
+    assigned_users: Mapped[list] = mapped_column(JSON, default=[])
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str] = mapped_column(String(64), default="u-admin")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ScheduleOccurrenceDB(Base):
+    __tablename__ = "schedule_occurrences"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    schedule_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    schedule_title: Mapped[str] = mapped_column(String(255), default="")
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="pending")
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    jsa_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class InspectionRecordDB(Base):
+    __tablename__ = "inspection_records"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    template_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    template_name: Mapped[str] = mapped_column(String(255), default="")
+    title: Mapped[str] = mapped_column(String(255), default="")
+    site: Mapped[str] = mapped_column(String(255), default="")
+    conducted_by: Mapped[str] = mapped_column(String(64), default="u-tech")
+    status: Mapped[str] = mapped_column(String(50), default="in_progress", index=True)
+    # answers: {question_id: {value, note, is_flagged, media_urls}}
+    answers: Mapped[dict] = mapped_column(JSON, default={})
+    # flagged_items: [{question_id, question_text, answer_value, note, action_created, skipped}]
+    flagged_items: Mapped[list] = mapped_column(JSON, default=[])
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total_questions: Mapped[int] = mapped_column(Integer, default=0)
+    answered_questions: Mapped[int] = mapped_column(Integer, default=0)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    pdf_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class NotificationDB(Base):
     __tablename__ = "notifications"
 
@@ -117,7 +218,6 @@ class NotificationDB(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-# Adding Audit Trail model
 class AuditLogDB(Base):
     __tablename__ = "audit_logs"
 

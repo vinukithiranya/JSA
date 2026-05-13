@@ -12,7 +12,7 @@ body {
   min-height: 100vh;
   font-family: "DM Sans", sans-serif;
   color: #1f2e1c;
-  background: linear-gradient(140deg, rgba(126, 219, 173, 0.55), rgba(236, 241, 208, 0.92));
+  background: #f2f9ef;
 }
 
 #root {
@@ -30,4 +30,52 @@ body {
   background: rgba(255, 255, 255, 0.84);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(102, 150, 77, 0.16);
+}
+
+/* ── Print / Export PDF ───────────────────────────────────────────────────── */
+@media print {
+  /* hide sidebar, topbar, action bar, browser chrome */
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  /* make the main content fill the full page */
+  body,
+  #root,
+  .flex.min-h-screen {
+    display: block !important;
+    background: white !important;
+  }
+
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* preserve background colours (green header, risk badges, etc.) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* report card: no rounded corners, no shadow */
+  .report-card {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* avoid page breaks inside hazard cards and sections */
+  .rounded-xl,
+  li,
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* page margin */
+  @page {
+    margin: 15mm 12mm;
+  }
 }

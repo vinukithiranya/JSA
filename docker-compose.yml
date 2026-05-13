@@ -1,36 +1,50 @@
-version: '3.8'
+version: "3.9"
+
+# ─── Single-command testing deployment ───────────────────────────────────────
+# docker compose up --build
+#
+# App URL  →  http://localhost:8000
+# API docs →  http://localhost:8000/docs
+#
+# Test logins (seeded automatically on first run):
+#   admin@rigpro.com      / admin123   (admin)
+#   supervisor@rigpro.com / super123   (supervisor)
+#   tech@rigpro.com       / tech123    (technician)
+# ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  frontend:
-    image: node:20-alpine
-    working_dir: /app
-    volumes:
-      - ./frontend:/app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
 
-  backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+psycopg2://rigpro:rigpro@db:5432/rigpro_jsa
-    depends_on:
-      - db
-
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
   db:
-    image: postgres:15
+    image: postgres:15-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: rigpro
+      POSTGRES_USER:     rigpro
       POSTGRES_PASSWORD: rigpro
-      POSTGRES_DB: rigpro_jsa
+      POSTGRES_DB:       rigpro_jsa
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rigpro -d rigpro_jsa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── App (FastAPI backend + built React frontend) ────────────────────────────
+  app:
+    build: .                          # uses root Dockerfile (multi-stage)
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://rigpro:rigpro@db:5432/rigpro_jsa
+    volumes:
+      - ./storage:/app/storage        # PDFs and uploads persist on your machine
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pg_data:

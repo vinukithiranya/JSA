@@ -28,7 +28,7 @@ export default function DocumentsPage({ user, onLogout }: Props) {
     formData.append("folder", folder);
     formData.append("description", "Uploaded from app");
 
-    await fetch("http://localhost:8000/api/documents/upload", {
+    await fetch("/api/documents/upload", {
       method: "POST",
       body: formData,
     });
@@ -55,7 +55,7 @@ export default function DocumentsPage({ user, onLogout }: Props) {
               <article key={doc.id} className="rounded-xl bg-white p-3">
                 <p className="font-semibold text-brand-900">{doc.original_filename}</p>
                 <p className="text-sm text-brand-700">{doc.category} / {doc.folder}</p>
-                <a className="text-sm text-brand-800 underline" href={`http://localhost:8000/${doc.file_path.replace(/\\/g, "/")}`} target="_blank">
+                <a className="text-sm text-brand-800 underline" href={`/${doc.file_path.replace(/\\/g, "/")}`} target="_blank">
                   Open file
                 </a>
               </article>

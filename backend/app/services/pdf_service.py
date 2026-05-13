@@ -1,97 +1,233 @@
+import base64
+from datetime import datetime, timezone
 from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    Image,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from app.schemas.models import JsaRecord
 
+BRAND_GREEN = colors.HexColor("#377133")
+BRAND_MID   = colors.HexColor("#499241")
+BRAND_LIGHT = colors.HexColor("#c2e5b2")
+BRAND_PALE  = colors.HexColor("#e1f2d9")
+
+
+def _sig_image(data_url: str) -> Image | None:
+    try:
+        b64 = data_url.split(",", 1)[1] if "," in data_url else data_url
+        raw = base64.b64decode(b64)
+        return Image(BytesIO(raw), width=3.2 * inch, height=1.0 * inch)
+    except Exception:
+        return None
+
 
 def generate_jsa_pdf(jsa: JsaRecord) -> bytes:
-    """Generate a PDF report for a JSA record using reportlab."""
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=0.5*inch, leftMargin=0.5*inch,
-                             topMargin=0.5*inch, bottomMargin=0.5*inch)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=0.55 * inch,
+        leftMargin=0.55 * inch,
+        topMargin=0.55 * inch,
+        bottomMargin=0.55 * inch,
+    )
 
-    styles = getSampleStyleSheet()
+    base = getSampleStyleSheet()
+
     title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=16,
-        textColor=colors.HexColor('#377133'),
+        "RTitle",
+        parent=base["Heading1"],
+        fontSize=18,
+        textColor=BRAND_GREEN,
+        spaceAfter=2,
+    )
+    sub_style = ParagraphStyle(
+        "RSub",
+        parent=base["Normal"],
+        fontSize=8,
+        textColor=colors.HexColor("#666666"),
         spaceAfter=12,
     )
     heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=12,
-        textColor=colors.HexColor('#499241'),
-        spaceAfter=8,
+        "RHeading",
+        parent=base["Heading2"],
+        fontSize=11,
+        textColor=BRAND_MID,
+        spaceBefore=10,
+        spaceAfter=5,
+    )
+    cell_style = ParagraphStyle(
+        "RCell",
+        parent=base["Normal"],
+        fontSize=9,
+        leading=13,
+    )
+    label_style = ParagraphStyle(
+        "RLabel",
+        parent=base["Normal"],
+        fontSize=9,
+        fontName="Helvetica-Bold",
+        leading=13,
+    )
+    footer_style = ParagraphStyle(
+        "RFooter",
+        parent=base["Normal"],
+        fontSize=7,
+        textColor=colors.grey,
+        spaceAfter=0,
     )
 
-    elements = []
+    elements: list = []
+    now_utc = datetime.now(timezone.utc)
+    now_str = now_utc.strftime("%d %b %Y  %H:%M UTC")
 
+    # ── Header ────────────────────────────────────────────────────────────────
     elements.append(Paragraph("RigPro Job Safety Assessment", title_style))
-    elements.append(Spacer(1, 0.2*inch))
+    elements.append(Paragraph(f"Generated: {now_str}", sub_style))
 
+    # ── Job Details ───────────────────────────────────────────────────────────
     elements.append(Paragraph("Job Details", heading_style))
-    job_data = [
-        ["Job Number", jsa.job_number],
-        ["Boat Name", jsa.boat_name],
-        ["Service Log", jsa.service_log_number],
-        ["Location", jsa.location],
-        ["Date", str(jsa.date)],
-        ["Status", jsa.status.replace("_", " ").title()],
+    job_rows = [
+        ["Job Number",    jsa.job_number],
+        ["Vessel / Boat", jsa.boat_name],
+        ["Service Log",   jsa.service_log_number],
+        ["Location",      jsa.location],
+        ["Date",          str(jsa.date)],
+        ["Status",        jsa.status.replace("_", " ").title()],
     ]
-    job_table = Table(job_data, colWidths=[2*inch, 4*inch])
+    if jsa.approved_by:
+        job_rows.append(["Approved By", jsa.approved_by])
+    job_table = Table(
+        [[Paragraph(r, label_style), Paragraph(v, cell_style)] for r, v in job_rows],
+        colWidths=[1.8 * inch, 4.65 * inch],
+    )
     job_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e1f2d9')),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#c2e5b2')),
+        ("BACKGROUND",    (0, 0), (0, -1), BRAND_PALE),
+        ("GRID",          (0, 0), (-1, -1), 0.5, BRAND_LIGHT),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING",    (0, 0), (-1, -1), 6),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
     ]))
     elements.append(job_table)
-    elements.append(Spacer(1, 0.2*inch))
 
+    # ── Work Steps ────────────────────────────────────────────────────────────
     elements.append(Paragraph("Work Steps", heading_style))
     for idx, step in enumerate(jsa.steps, 1):
-        elements.append(Paragraph(f"{idx}. {step}", styles['Normal']))
-    elements.append(Spacer(1, 0.2*inch))
+        elements.append(Paragraph(f"{idx}.&nbsp;&nbsp;{step}", cell_style))
 
+    # ── Identified Hazards ────────────────────────────────────────────────────
+    elements.append(Spacer(1, 0.1 * inch))
     elements.append(Paragraph("Identified Hazards", heading_style))
     if jsa.hazards:
-        hazard_data = [["Hazard", "Controls", "Pre", "Post"]]
+        hdr = [
+            Paragraph("<b>Hazard</b>", cell_style),
+            Paragraph("<b>Controls Required</b>", cell_style),
+            Paragraph("<b>Pre</b>", cell_style),
+            Paragraph("<b>Post</b>", cell_style),
+        ]
+        hazard_rows = [hdr]
         for h in jsa.hazards:
-            hazard_data.append([
-                h.hazard_name,
-                h.controls[:30] + "..." if len(h.controls) > 30 else h.controls,
-                f"{h.pre_score}",
-                f"{h.post_score}",
+            hazard_rows.append([
+                Paragraph(h.hazard_name, cell_style),
+                Paragraph(h.controls, cell_style),
+                Paragraph(f"<b>{h.pre_score}</b>", cell_style),
+                Paragraph(f"<b>{h.post_score}</b>", cell_style),
             ])
-        hazard_table = Table(hazard_data, colWidths=[1.5*inch, 2*inch, 0.75*inch, 0.75*inch])
+        hazard_table = Table(
+            hazard_rows,
+            colWidths=[1.6 * inch, 3.55 * inch, 0.55 * inch, 0.55 * inch],
+        )
         hazard_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#499241')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#c2e5b2')),
+            ("BACKGROUND",     (0, 0), (-1, 0),  BRAND_MID),
+            ("TEXTCOLOR",      (0, 0), (-1, 0),  colors.whitesmoke),
+            ("GRID",           (0, 0), (-1, -1), 0.5, BRAND_LIGHT),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 6),
+            ("TOPPADDING",     (0, 0), (-1, -1), 6),
+            ("VALIGN",         (0, 0), (-1, -1), "TOP"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BRAND_PALE]),
         ]))
         elements.append(hazard_table)
     else:
-        elements.append(Paragraph("No hazards identified.", styles['Normal']))
-    elements.append(Spacer(1, 0.2*inch))
+        elements.append(Paragraph("No hazards identified.", cell_style))
 
+    # ── Required PPE ──────────────────────────────────────────────────────────
+    elements.append(Spacer(1, 0.1 * inch))
     elements.append(Paragraph("Required PPE", heading_style))
-    for ppe in jsa.ppe_list:
-        elements.append(Paragraph(f"• {ppe}", styles['Normal']))
+    if jsa.ppe_list:
+        ppe_rows = [[Paragraph(f"• &nbsp;{p}", cell_style)] for p in jsa.ppe_list]
+        ppe_table = Table(ppe_rows, colWidths=[6.45 * inch])
+        ppe_table.setStyle(TableStyle([
+            ("GRID",           (0, 0), (-1, -1), 0.5, BRAND_LIGHT),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
+            ("TOPPADDING",     (0, 0), (-1, -1), 5),
+            ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, BRAND_PALE]),
+        ]))
+        elements.append(ppe_table)
+    else:
+        elements.append(Paragraph("No PPE items specified.", cell_style))
+
+    # ── Supervisor Approval ───────────────────────────────────────────────────
+    elements.append(Spacer(1, 0.25 * inch))
+    elements.append(Paragraph("Supervisor Approval", heading_style))
+
+    sig_rows: list = []
+
+    if jsa.supervisor_signature:
+        img = _sig_image(jsa.supervisor_signature)
+        sig_cell = img if img else Paragraph("(signature on file)", cell_style)
+    else:
+        sig_cell = Paragraph("_" * 55, cell_style)
+
+    sig_rows.append([Paragraph("Signature:", label_style), sig_cell])
+    sig_rows.append([
+        Paragraph("Approved By:", label_style),
+        Paragraph(jsa.approved_by or "—", cell_style),
+    ])
+    approval_date = (
+        now_utc.strftime("%d %b %Y  %H:%M UTC")
+        if jsa.status == "approved"
+        else "Pending"
+    )
+    sig_rows.append([Paragraph("Date / Time:", label_style), Paragraph(approval_date, cell_style)])
+
+    status_text = (
+        '<font color="#1a7c2e"><b>✓ APPROVED</b></font>'
+        if jsa.status == "approved"
+        else jsa.status.replace("_", " ").title()
+    )
+    sig_rows.append([Paragraph("Status:", label_style), Paragraph(status_text, cell_style)])
+
+    sig_table = Table(sig_rows, colWidths=[1.5 * inch, 4.95 * inch])
+    sig_table.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (0, -1), BRAND_PALE),
+        ("GRID",          (0, 0), (-1, -1), 0.5, BRAND_LIGHT),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING",    (0, 0), (-1, -1), 8),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    elements.append(sig_table)
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    elements.append(Spacer(1, 0.2 * inch))
+    elements.append(Paragraph(
+        "This document was generated by RigPro JSA Platform. "
+        "All approvals are subject to the applicable safety management system. "
+        f"Record ID: {jsa.id}",
+        footer_style,
+    ))
 
     doc.build(elements)
-    pdf_bytes = buffer.getvalue()
+    data = buffer.getvalue()
     buffer.close()
-    return pdf_bytes
+    return data

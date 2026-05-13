@@ -1,39 +1,57 @@
 from app.schemas.models import HazardOut
 
+# Maps question ID → hazard IDs triggered when answered "Yes"
 QUESTION_TO_HAZARDS: dict[str, list[int]] = {
-    "q1": [1],
-    "q2": [2],
-    "q8": [8],
-    "q12": [18, 14],
-    "q15": [21],
-    "q19": [22],
-    "q20": [23],
+    "q1":  [1],       "q2":  [2],       "q3":  [3],       "q4":  [5],
+    "q5":  [6, 12],   "q6":  [7],       "q7":  [8],       "q8":  [9],
+    "q9":  [10],      "q10": [11, 17],  "q11": [13],      "q12": [18, 14],
+    "q13": [19, 14],  "q14": [14],      "q15": [15],      "q16": [16],
+    "q17": [17],      "q18": [20],      "q19": [21, 14],  "q20": [21, 5],
+    "q21": [5, 21],   "q22": [22],
+    "q23": [23],      "q24": [24],      "q25": [25],
+}
+
+# Low = l:1 s:2 (score 2), Medium = l:2 s:2 (score 4), High = l:3 s:3 (score 9)
+HAZARD_MASTER: dict[int, dict] = {
+    1:  {"name": "Manual Handling",              "controls": "Correct lifting techniques; Team lift >20kg or awkward; Gloves; Safety footwear",                          "ppe": "Gloves; Safety footwear",                             "l": 1, "s": 2},
+    2:  {"name": "Hand Tools",                   "controls": "Safe operation; Safe storage; Correct PPE; Do not use damaged tools",                                     "ppe": "Gloves; Eye protection; Safety footwear",             "l": 1, "s": 2},
+    3:  {"name": "Trip Hazards",                 "controls": "Good housekeeping; Safe stacking/storage; Remove rubbish; Safety footwear",                               "ppe": "Safety footwear",                                     "l": 1, "s": 2},
+    4:  {"name": "Pinch and Nip Hazards",        "controls": "Competent assembly; Trained removal; Gloves",                                                             "ppe": "Gloves; Safety footwear",                             "l": 2, "s": 2},
+    5:  {"name": "Lifting Equipment",            "controls": "Certified slings/shackles; No damage",                                                                    "ppe": "Helmet; Gloves; Eye protection; Safety footwear",     "l": 3, "s": 3},
+    6:  {"name": "Feet Hazards",                 "controls": "Awareness of hazards; Enclosed footwear; Avoid under-height work",                                        "ppe": "Safety footwear",                                     "l": 1, "s": 2},
+    7:  {"name": "Slip Hazards",                 "controls": "Awareness; Tidy area; Wipe spills; Remove rubbish; Footwear/overshoes; Lifelines",                        "ppe": "Safety footwear; Overshoes",                          "l": 2, "s": 2},
+    8:  {"name": "Ladder",                       "controls": "Trained users; Correct type; Certified; Correct positioning; Isolate below",                              "ppe": "Safety footwear; Helmet",                             "l": 2, "s": 2},
+    9:  {"name": "Forklift",                     "controls": "Trained operators; Approved attachments; Signage",                                                        "ppe": "Hi-Vis; Safety footwear",                             "l": 3, "s": 3},
+    10: {"name": "Hydraulics",                   "controls": "Report issues; Trained workers",                                                                          "ppe": "Gloves; Safety footwear",                             "l": 2, "s": 2},
+    11: {"name": "Traffic",                      "controls": "Cordon with cones; Hi-Vis",                                                                               "ppe": "Hi-Vis; Safety footwear",                             "l": 1, "s": 2},
+    12: {"name": "Open Hatches",                 "controls": "Advise personnel; Close hatches; Trained only",                                                           "ppe": "Safety footwear; Helmet",                             "l": 2, "s": 2},
+    13: {"name": "Weather/Environment",          "controls": "Sun protection; Lightning stop; Dust mask",                                                               "ppe": "Sun protection; Dust mask; Safety footwear",          "l": 2, "s": 2},
+    14: {"name": "Items Dropped from Height",    "controls": "Lanyards; Clear below; Helmets/footwear",                                                                 "ppe": "Helmet; Safety footwear",                             "l": 3, "s": 3},
+    15: {"name": "High Load Equipment",          "controls": "Trained only; Assess area; Notify",                                                                       "ppe": "Gloves; Safety footwear",                             "l": 2, "s": 2},
+    16: {"name": "Winches",                      "controls": "Trained operators; No loose clothing",                                                                    "ppe": "No loose clothing; Safety footwear; Gloves",          "l": 2, "s": 2},
+    17: {"name": "Pedestrians",                  "controls": "Load/unload away; Cordon; Escort pedestrians; Hi-Vis",                                                    "ppe": "Hi-Vis; Safety footwear",                             "l": 1, "s": 2},
+    18: {"name": "Working at Height (>2m)",      "controls": "Trained only; Working Aloft procedures; Helmet/harness; Radios; Suspension trauma plan",                  "ppe": "Helmet; Harness + Lanyard; Radios; Safety footwear",  "l": 3, "s": 3},
+    19: {"name": "Working at Height (<2m)",      "controls": "Trained only; Edge awareness; 3 points of contact; Short ladder work",                                    "ppe": "Safety footwear; Helmet",                             "l": 2, "s": 2},
+    20: {"name": "Electricity",                  "controls": "Use near power; RCDs; Keep dry; Report damage",                                                           "ppe": "Gloves; Safety footwear; RCD device",                 "l": 2, "s": 2},
+    21: {"name": "Cranes",                       "controls": "Qualified operator; Certified crane; Outriggers; Clear slew area; Hook latch; Taglines; No one under load","ppe": "Helmet; Gloves; Safety footwear; Hi-Vis",             "l": 3, "s": 3},
+    22: {"name": "Air Particulates (Dust)",      "controls": "Extraction/ventilation; Enclose area; Respiratory+eye protection",                                        "ppe": "Respirator; Eye protection; Gloves; Safety footwear", "l": 2, "s": 2},
+    23: {"name": "Resins/Solvents",              "controls": "Ventilation; PPE; Eyewash; Safe containers",                                                              "ppe": "Gloves; Respirator; Eye protection; Safety footwear", "l": 2, "s": 2},
+    24: {"name": "Carbon Monoxide (Generators)", "controls": "Use outdoors; Avoid enclosed spaces; Airflow control",                                                    "ppe": "Respirator; Safety footwear",                         "l": 3, "s": 3},
+    25: {"name": "Fire from Ovens (Curing)",     "controls": "Temperature control; Keep combustibles away; Heat PPE",                                                   "ppe": "Heat-resistant gloves; Eye protection; Safety footwear","l": 3, "s": 3},
 }
 
 KEYWORD_MAP: dict[int, list[str]] = {
-    1: ["lift", "carry", "manual", "heavy"],
-    5: ["crane", "hoist", "sling", "rigging"],
-    8: ["ladder"],
-    18: ["height", "mast", "climb", "aloft"],
+    1:  ["lift", "carry", "manual", "heavy", "handling"],
+    5:  ["sling", "shackle", "rigging", "hoist"],
+    8:  ["ladder"],
+    9:  ["forklift", "fork lift"],
+    14: ["drop", "overhead"],
+    18: ["mast", "climb", "aloft", "scaffold"],
     21: ["crane"],
-    22: ["grind", "dust", "cut", "sand"],
+    22: ["grind", "dust", "cut", "sand", "composite"],
     23: ["resin", "epoxy", "solvent", "chemical"],
-    24: ["generator"],
-    25: ["oven", "heat", "hot box"],
-}
-
-HAZARD_MASTER: dict[int, dict[str, str | int]] = {
-    1: {"name": "Manual Handling", "controls": "Use team lifting and correct posture", "ppe": "Gloves; Safety footwear", "l": 2, "s": 2},
-    2: {"name": "Hand Tools", "controls": "Inspect tools and use guards", "ppe": "Gloves; Eye protection", "l": 2, "s": 2},
-    5: {"name": "Lifting Equipment", "controls": "Use certified slings and pre-lift checks", "ppe": "Helmet; Gloves; Safety footwear", "l": 3, "s": 3},
-    8: {"name": "Ladder Use", "controls": "Secure ladder and maintain 3 points of contact", "ppe": "Helmet; Safety footwear", "l": 2, "s": 3},
-    14: {"name": "Dropped Objects", "controls": "Use tool lanyards and exclusion zones", "ppe": "Helmet; Eye protection", "l": 2, "s": 3},
-    18: {"name": "Working at Height", "controls": "Use fall arrest and permit-to-work", "ppe": "Harness; Helmet", "l": 3, "s": 3},
-    21: {"name": "Cranes and Loads", "controls": "Banksman communication and load plans", "ppe": "Helmet; Gloves; Safety footwear", "l": 3, "s": 3},
-    22: {"name": "Air Particulates", "controls": "Dust extraction and wet methods", "ppe": "Respirator; Eye protection", "l": 2, "s": 2},
-    23: {"name": "Chemical Exposure", "controls": "SDS review and ventilation", "ppe": "Gloves; Respirator", "l": 2, "s": 3},
-    24: {"name": "Portable Power", "controls": "RCD testing and cable checks", "ppe": "Gloves; Safety footwear", "l": 2, "s": 2},
-    25: {"name": "Hot Surfaces", "controls": "Heat barriers and cool-down periods", "ppe": "Heat gloves; Eye protection", "l": 2, "s": 3},
+    24: ["generator", "exhaust"],
+    25: ["oven", "curing", "hot box"],
 }
 
 
@@ -66,19 +84,17 @@ def detect_hazards(steps: list[str], answers: dict[str, bool]) -> tuple[list[Haz
         ppe_items = [item.strip() for item in str(source["ppe"]).split(";")]
         ppe_set.update(item for item in ppe_items if item)
 
-        hazards.append(
-            HazardOut(
-                hazard_id=hazard_id,
-                hazard_name=str(source["name"]),
-                controls=str(source["controls"]),
-                ppe=str(source["ppe"]),
-                pre_likelihood=pre_l,
-                pre_severity=pre_s,
-                pre_score=pre_l * pre_s,
-                post_likelihood=post_l,
-                post_severity=post_s,
-                post_score=post_l * post_s,
-            )
-        )
+        hazards.append(HazardOut(
+            hazard_id=hazard_id,
+            hazard_name=str(source["name"]),
+            controls=str(source["controls"]),
+            ppe=str(source["ppe"]),
+            pre_likelihood=pre_l,
+            pre_severity=pre_s,
+            pre_score=pre_l * pre_s,
+            post_likelihood=post_l,
+            post_severity=post_s,
+            post_score=post_l * post_s,
+        ))
 
     return hazards, sorted(list(ppe_set))

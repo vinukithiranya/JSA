@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.models.db_models import JsaRecordDB
-from app.schemas.models import AnalyzeResponse, JsaDraftCreate, JsaQuestionnaireUpdate, JsaRecord, JsaStepsUpdate
+from app.schemas.models import AnalyzeResponse, ApproveRequest, JsaDraftCreate, JsaQuestionnaireUpdate, JsaRecord, JsaStepsUpdate
 from app.services.hazard_engine import detect_hazards
 from app.services.mappers import to_jsa_out
 from app.services.pdf_service import generate_jsa_pdf
@@ -101,13 +101,14 @@ def submit(jsa_id: str, db: Session = Depends(get_db)) -> JsaRecord:
 
 
 @router.post("/{jsa_id}/approve", response_model=JsaRecord)
-def approve(jsa_id: str, db: Session = Depends(get_db)) -> JsaRecord:
+def approve(jsa_id: str, payload: ApproveRequest, db: Session = Depends(get_db)) -> JsaRecord:
     record = db.query(JsaRecordDB).filter(JsaRecordDB.id == jsa_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="JSA not found")
 
     record.status = "approved"
-    record.approved_by = "u-sup"
+    record.approved_by = payload.supervisor_name or "Supervisor"
+    record.supervisor_signature = payload.signature
     db.commit()
     db.refresh(record)
     return to_jsa_out(record)
