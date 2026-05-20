@@ -15,6 +15,11 @@ import InspectionsPage from "./pages/InspectionsPage";
 import InspectionConductPage from "./pages/InspectionConductPage";
 import InspectionReportPage from "./pages/InspectionReportPage";
 import JsaReportPage from "./pages/JsaReportPage";
+import TemplatesPage from "./pages/TemplatesPage";
+import TemplateBuilderPage from "./pages/TemplateBuilderPage";
+import TrainingPage from "./pages/TrainingPage";
+import AssetsPage from "./pages/AssetsPage";
+import ContractorsPage from "./pages/ContractorsPage";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -43,6 +48,12 @@ export default function App() {
       <Route path="/issues"                  element={user ? <IssuesPage             user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/actions"                 element={user ? <ActionsPage            user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/scheduling"              element={user ? <SchedulingPage         user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
+      <Route path="/templates"               element={user ? <TemplatesPage          user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
+      <Route path="/templates/new"           element={user ? <TemplateBuilderPage    user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
+      <Route path="/templates/edit/:id"      element={user ? <TemplateBuilderPage    user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
+      <Route path="/training"                element={user ? <TrainingPage           user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
+      <Route path="/assets"                  element={user ? <AssetsPage             user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
+      <Route path="/contractors"             element={user ? <ContractorsPage        user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
     </Routes>
   );
 }

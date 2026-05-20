@@ -36,6 +36,13 @@ class TemplateOut(BaseModel):
     form_schema: dict = Field(default_factory=dict)
 
 
+class TemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    form_schema: Optional[dict] = None
+
+
 class JsaDraftCreate(BaseModel):
     job_number: str
     boat_name: str
