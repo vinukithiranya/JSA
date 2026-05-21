@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import type { User } from "../types";
@@ -12,6 +12,18 @@ type AnyResponseType =
   | "media" | "slider" | "annotation" | "signature" | "location"
   | "instruction" | "table";
 
+type LogicOp = "is" | "is_not" | "is_selected" | "is_not_selected" | "is_one_of" | "is_not_one_of"
+  | "lt" | "lte" | "eq" | "neq" | "gte" | "gt" | "between"
+  | "checked" | "not_checked" | "exists" | "not_exists";
+type LogicTrigger = "ask_questions" | "require_action" | "require_evidence" | "notify" | "skip_to_complete";
+
+interface LogicRule {
+  id: string; op: LogicOp; value: string; value2?: string;
+  trigger: LogicTrigger;
+  evidence_notes?: boolean; evidence_media?: boolean;
+  notify_msg?: string;
+}
+
 interface OptionMeta { id: string; label: string; color: string; is_flagged: boolean; score: number | null }
 interface TableColumn { id: string; label: string; type: string; options?: string[] }
 
@@ -23,8 +35,10 @@ interface TQuestion {
   table_columns?: TableColumn[];
   text_format?: "short" | "long";
   number_unit?: string;
+  number_format?: "number" | "percentage" | "cost";
   include_date?: boolean; include_time?: boolean;
   doc_number_format?: string;
+  logic_rules?: LogicRule[];
   nested_questions?: TQuestion[];
 }
 
@@ -66,19 +80,56 @@ function isFlagged(q: TQuestion, value: AnswerState["value"]): boolean {
   return q.flagged_responses.includes(s);
 }
 
+function evalRule(rule: LogicRule, value: AnswerState["value"]): boolean {
+  const v = value === null || value === undefined ? "" : String(value);
+  const num = parseFloat(v);
+  switch (rule.op) {
+    case "is": return v === rule.value;
+    case "is_not": return v !== rule.value;
+    case "is_selected": return v !== "" && value !== null;
+    case "is_not_selected": return v === "" || value === null;
+    case "is_one_of": return rule.value.split(",").map(s => s.trim()).includes(v);
+    case "is_not_one_of": return !rule.value.split(",").map(s => s.trim()).includes(v);
+    case "lt": return !isNaN(num) && num < parseFloat(rule.value);
+    case "lte": return !isNaN(num) && num <= parseFloat(rule.value);
+    case "eq": return !isNaN(num) && num === parseFloat(rule.value);
+    case "neq": return !isNaN(num) && num !== parseFloat(rule.value);
+    case "gte": return !isNaN(num) && num >= parseFloat(rule.value);
+    case "gt": return !isNaN(num) && num > parseFloat(rule.value);
+    case "between": return !isNaN(num) && num >= parseFloat(rule.value) && num <= parseFloat(rule.value2 ?? rule.value);
+    case "checked": return value === true || v === "true" || v === "checked";
+    case "not_checked": return value !== true && v !== "true" && v !== "checked";
+    case "exists": return v !== "" && value !== null;
+    case "not_exists": return v === "" || value === null;
+    default: return false;
+  }
+}
+
+function activeTriggers(q: TQuestion, value: AnswerState["value"]): Set<LogicTrigger> {
+  const active = new Set<LogicTrigger>();
+  for (const rule of q.logic_rules ?? []) {
+    if (evalRule(rule, value)) active.add(rule.trigger);
+  }
+  return active;
+}
+
 function isAnswered(a: AnswerState | undefined): boolean {
   if (!a) return false;
   const v = a.value;
   return v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
 }
 
-function allQids(schema: FormSchema): string[] {
-  return schema.sections.flatMap(s => s.questions.map(q => q.id));
+function collectQids(questions: TQuestion[]): string[] {
+  return questions.flatMap(q => [q.id, ...(q.nested_questions ? collectQids(q.nested_questions) : [])]);
 }
 
-function sectionScore(section: TSection, answers: Record<string, AnswerState>): { earned: number; max: number } {
+function allQids(schema: FormSchema): string[] {
+  return schema.sections.flatMap(s => collectQids(s.questions));
+}
+
+function scoreQuestions(questions: TQuestion[], answers: Record<string, AnswerState>): { earned: number; max: number } {
   let earned = 0; let max = 0;
-  for (const q of section.questions) {
+  for (const q of questions) {
     if (q.type === "multiple_choice" && q.score_map) {
       const vals = Object.values(q.score_map).filter(v => v !== null) as number[];
       const qMax = vals.length ? Math.max(...vals) : 0;
@@ -88,8 +139,16 @@ function sectionScore(section: TSection, answers: Record<string, AnswerState>): 
         earned += q.score_map[ans.value as string] ?? 0;
       }
     }
+    if (q.nested_questions?.length) {
+      const sub = scoreQuestions(q.nested_questions, answers);
+      earned += sub.earned; max += sub.max;
+    }
   }
   return { earned, max };
+}
+
+function sectionScore(section: TSection, answers: Record<string, AnswerState>): { earned: number; max: number } {
+  return scoreQuestions(section.questions, answers);
 }
 
 // ── Response Renderers ────────────────────────────────────────────────────────
@@ -410,9 +469,10 @@ function TableAnswerInput({ q, value, onChange }: {
 
 // ── Question Card ─────────────────────────────────────────────────────────────
 
-function QuestionCard({ q, ans, noteOpen, onAnswer, onNote, onMedia, onToggleNote, onCreateAction }:
+function QuestionCard({ q, ans, noteOpen, onAnswer, onNote, onMedia, onToggleNote, onCreateAction, requireAction, requireEvidence }:
   {
     q: TQuestion; ans: AnswerState; noteOpen: boolean;
+    requireAction?: boolean; requireEvidence?: boolean;
     onAnswer: (v: AnswerState["value"]) => void; onNote: (v: string) => void;
     onMedia: (v: string[]) => void; onToggleNote: () => void; onCreateAction: () => void;
   }) {
@@ -467,6 +527,19 @@ function QuestionCard({ q, ans, noteOpen, onAnswer, onNote, onMedia, onToggleNot
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 21l1.9-5.7a8.5 8.5 0 113.8 3.8z" /></svg>
             This response has been flagged
           </p>
+        )}
+        {requireAction && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            <span className="flex-1">An action is required for this response</span>
+            <button onClick={onCreateAction} className="shrink-0 rounded bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700">Create action</button>
+          </div>
+        )}
+        {requireEvidence && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700">
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            Evidence required — add a note or attach media
+          </div>
         )}
         {renderInput()}
       </div>
@@ -572,15 +645,21 @@ export default function InspectionConductPage({ user, onLogout: _onLogout }: Pro
     setAnswers(prev => { const next = { ...prev, [qid]: { ...prev[qid], media_urls } }; saveAnswers(next); return next; });
   }
 
+  function collectFlagged(questions: TQuestion[], flaggedItems: FlaggedItem[]) {
+    for (const q of questions) {
+      const ans = answers[q.id];
+      if (ans?.is_flagged) flaggedItems.push({ question_id: q.id, question_text: q.text, answer_value: String(ans.value), note: ans.note ?? "", action_created: false, skipped: false });
+      if (q.nested_questions?.length) {
+        const triggers = activeTriggers(q, ans?.value ?? null);
+        if (triggers.has("ask_questions")) collectFlagged(q.nested_questions, flaggedItems);
+      }
+    }
+  }
+
   function handleComplete() {
     if (!schema) return;
     const flaggedItems: FlaggedItem[] = [];
-    for (const section of schema.sections) {
-      for (const q of section.questions) {
-        const ans = answers[q.id];
-        if (ans?.is_flagged) flaggedItems.push({ question_id: q.id, question_text: q.text, answer_value: String(ans.value), note: ans.note ?? "", action_created: false, skipped: false });
-      }
-    }
+    for (const section of schema.sections) collectFlagged(section.questions, flaggedItems);
     setInspection(prev => prev ? { ...prev, flagged_items: flaggedItems } : prev);
     setShowFlagged(true);
   }
@@ -788,17 +867,32 @@ export default function InspectionConductPage({ user, onLogout: _onLogout }: Pro
                   <p className="font-medium">No questions in this section</p>
                 </div>
               )}
-              {currentSection.questions.map(q => {
-                const ans = answers[q.id] ?? { value: null, note: "", is_flagged: false, media_urls: [] };
-                return (
-                  <QuestionCard key={q.id} q={q} ans={ans} noteOpen={noteOpen === q.id}
-                    onAnswer={v => setAnswer(q.id, v, q)}
-                    onNote={v => setNote(q.id, v)}
-                    onMedia={v => setMediaUrls(q.id, v)}
-                    onToggleNote={() => setNoteOpen(noteOpen === q.id ? null : q.id)}
-                    onCreateAction={() => navigate(`/actions?prefill=${encodeURIComponent(`${q.text} — ${ans.value ?? ""}`)}`)} />
-                );
-              })}
+              {(function renderQList(questions: TQuestion[], depth: number): React.ReactNode {
+                return questions.map(q => {
+                  const ans = answers[q.id] ?? { value: null, note: "", is_flagged: false, media_urls: [] };
+                  const triggers = activeTriggers(q, ans.value);
+                  const showNested = triggers.has("ask_questions") && (q.nested_questions?.length ?? 0) > 0;
+                  return (
+                    <React.Fragment key={q.id}>
+                      <QuestionCard
+                        q={q} ans={ans} noteOpen={noteOpen === q.id}
+                        requireAction={triggers.has("require_action")}
+                        requireEvidence={triggers.has("require_evidence")}
+                        onAnswer={v => setAnswer(q.id, v, q)}
+                        onNote={v => setNote(q.id, v)}
+                        onMedia={v => setMediaUrls(q.id, v)}
+                        onToggleNote={() => setNoteOpen(noteOpen === q.id ? null : q.id)}
+                        onCreateAction={() => navigate(`/actions?prefill=${encodeURIComponent(`${q.text} — ${ans.value ?? ""}`)}`)}
+                      />
+                      {showNested && (
+                        <div className={`space-y-3 ${depth === 0 ? "ml-6 border-l-2 border-brand-300 pl-4" : "ml-4 border-l border-brand-200 pl-3"}`}>
+                          {renderQList(q.nested_questions!, depth + 1)}
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                });
+              })(currentSection.questions, 0)}
             </div>
 
             {/* Page navigation */}

@@ -51,6 +51,7 @@ interface FormSchema { sections: Section[]; header_image?: string }
 // ─── RightPanelState ──────────────────────────────────────────────────────────
 
 type RightPanelState =
+  | { type: "mc_library" }
   | { type: "mc" }
   | { type: "table" }
   | { type: "logic_config"; ruleId: string }
@@ -217,65 +218,27 @@ function syncOptionArrays(q: Question): Question {
 
 // ─── Type Picker Panel ────────────────────────────────────────────────────────
 
-function TypePickerPanel({ isTitlePage, current, onSelect, onClose, onSelectPreset }: {
+function TypePickerPanel({ isTitlePage, current, onSelect, onClose }: {
   isTitlePage: boolean; current: ResponseType;
   onSelect: (t: ResponseType) => void; onClose: () => void;
-  onSelectPreset?: (meta: OptionMeta[]) => void;
 }) {
   const [search, setSearch] = useState("");
   const types = isTitlePage ? TITLE_TYPES : INSPECT_TYPES;
   const filtered = types.filter(t => t.label.toLowerCase().includes(search.toLowerCase()));
-  const showPresets = !isTitlePage && !search && !!onSelectPreset;
 
   return (
-    <div className="absolute left-0 top-full z-50 mt-1 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.14)]">
-      {/* Search */}
+    <div className="absolute left-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.14)]">
       <div className="border-b border-gray-100 px-3 py-2.5">
-        <input
-          autoFocus
-          value={search}
-          onChange={e => setSearch(e.target.value)}
+        <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search response types…"
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100 transition"
-        />
+          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100 transition" />
       </div>
-
-      <div className="max-h-96 overflow-y-auto">
-        {/* MC Presets */}
-        {showPresets && (
-          <>
-            <p className="px-3.5 pt-3 pb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">Multiple choice presets</p>
-            {MC_PRESETS.map(preset => (
-              <button key={preset.label} onClick={() => {
-                const meta: OptionMeta[] = preset.opts.map(o => ({ id: uid(), label: o.label, color: o.color, is_flagged: o.is_flagged, score: null }));
-                onSelectPreset!(meta);
-                onSelect("multiple_choice");
-                onClose();
-              }} className="flex w-full flex-col px-3.5 py-2.5 text-left hover:bg-brand-50 transition">
-                <span className="text-sm font-medium text-gray-800">{preset.label}</span>
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {preset.opts.map(o => {
-                    const cc = OPT_COLORS.find(c => c.v === o.color);
-                    return (
-                      <span key={o.label} className={`rounded-full px-2 py-0.5 text-xs font-medium ${cc?.chip ?? "bg-gray-100 text-gray-600"}`}>
-                        {o.label}
-                      </span>
-                    );
-                  })}
-                </div>
-              </button>
-            ))}
-            <div className="mx-3.5 my-1.5 border-t border-gray-100" />
-            <p className="px-3.5 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Other responses</p>
-          </>
-        )}
-
-        {/* All types (filtered) */}
+      <div className="max-h-72 overflow-y-auto py-1">
         {filtered.map(t => (
           <button key={t.value} onClick={() => { onSelect(t.value); onClose(); }}
             className={`flex w-full items-center justify-between px-3.5 py-2.5 text-sm transition hover:bg-brand-50 ${current === t.value ? "font-semibold text-brand-700 bg-brand-50/70" : "text-gray-800"}`}>
             <span className="flex items-center gap-2.5">
-              {(t as { icon?: string }).icon && <span className="w-5 text-center">{(t as { icon?: string }).icon}</span>}
+              {(t as { icon?: string }).icon && <span className="w-5 text-center text-base">{(t as { icon?: string }).icon}</span>}
               {t.label}
             </span>
             {current === t.value && (
@@ -290,8 +253,9 @@ function TypePickerPanel({ isTitlePage, current, onSelect, onClose, onSelectPres
 
 // ─── MC Options Right Panel ────────────────────────────────────────────────────
 
-function MCOptionsPanel({ meta, onChange, onClose }: {
+function MCOptionsPanel({ meta, onChange, onClose, onBack }: {
   meta: OptionMeta[]; onChange: (m: OptionMeta[]) => void; onClose: () => void;
+  onBack?: () => void;
 }) {
   const [items, setItems] = useState<OptionMeta[]>(() => meta.length ? meta : defaultOptionMeta());
   const [scoring, setScoring] = useState(() => meta.some(m => m.score !== null));
@@ -300,7 +264,7 @@ function MCOptionsPanel({ meta, onChange, onClose }: {
     setItems(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
   }
   function add() {
-    setItems(prev => [...prev, { id: uid(), label: "Option", color: "gray" as OptionColor, is_flagged: false, score: null }]);
+    setItems(prev => [...prev, { id: uid(), label: "New option", color: "gray" as OptionColor, is_flagged: false, score: null }]);
   }
   function remove(id: string) {
     setItems(prev => prev.filter(i => i.id !== id));
@@ -314,37 +278,42 @@ function MCOptionsPanel({ meta, onChange, onClose }: {
       return next;
     });
   }
-  function saveAndApply() { onChange(items); onClose(); }
+  function saveAndApply() { onChange(items); if (onBack) onBack(); else onClose(); }
 
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
-        <div>
-          <p className="font-display text-sm font-semibold text-gray-900">Multiple choice responses</p>
-          <p className="text-xs text-gray-500">Configure options, flags, and scores</p>
+      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <button onClick={onBack} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+            </button>
+          )}
+          <div>
+            <p className="font-display text-sm font-semibold text-gray-900">Multiple choice responses</p>
+            <p className="text-xs text-gray-400">e.g. Yes, No, N/A</p>
+          </div>
         </div>
-        <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-      </div>
-
-      {/* Scoring checkbox */}
-      <div className="flex items-center gap-2.5 border-b border-gray-100 px-5 py-3">
-        <label className="flex cursor-pointer items-center gap-2">
+        <label className="flex cursor-pointer items-center gap-1.5">
           <input type="checkbox" checked={scoring} onChange={e => setScoring(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 accent-brand-600" />
-          <span className="text-sm font-medium text-gray-700">Enable scoring</span>
+            className="h-3.5 w-3.5 rounded border-gray-300 accent-brand-600" />
+          <span className="text-xs font-semibold text-gray-600">Scoring</span>
         </label>
       </div>
 
+      {/* Response label */}
+      <div className="border-b border-gray-100 px-4 py-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Response</p>
+      </div>
+
       {/* Options list */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
         {items.map((item, idx) => (
           <div key={item.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            {/* Row 1: reorder + label input + color dot */}
-            <div className="flex items-center gap-2.5 px-3 py-2.5">
-              <div className="flex shrink-0 flex-col gap-0.5">
+            {/* Row 1: drag + label + color dot (right) */}
+            <div className="flex items-center gap-2 px-2 py-2">
+              <div className="flex shrink-0 flex-col gap-0.5 cursor-grab">
                 <button onClick={() => move(idx, -1)} disabled={idx === 0}
                   className="text-gray-300 hover:text-gray-500 disabled:opacity-20 transition">
                   <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>
@@ -356,10 +325,10 @@ function MCOptionsPanel({ meta, onChange, onClose }: {
               </div>
               <input value={item.label} onChange={e => update(item.id, { label: e.target.value })}
                 className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-100 transition" />
-              {/* Color picker */}
+              {/* Color dot — right side */}
               <div className="relative shrink-0 group/color">
-                <button className={`h-5 w-5 rounded-full ${OPT_COLORS.find(c => c.v === item.color)?.dot ?? "bg-gray-400"} ring-2 ring-white shadow-sm`} />
-                <div className="absolute right-0 top-full z-50 mt-1 hidden w-40 flex-wrap gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-card group-hover/color:flex">
+                <button className={`h-5 w-5 rounded-full ${OPT_COLORS.find(c => c.v === item.color)?.dot ?? "bg-gray-400"} ring-2 ring-white shadow-sm hover:ring-gray-300 transition`} />
+                <div className="absolute right-0 top-full z-50 mt-1 hidden w-40 flex-wrap gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg group-hover/color:flex">
                   {OPT_COLORS.map(c => (
                     <button key={c.v} onClick={() => update(item.id, { color: c.v })}
                       className={`h-5 w-5 rounded-full ${c.dot} ${item.color === c.v ? "ring-2 ring-brand-500 ring-offset-1" : ""}`} />
@@ -368,26 +337,31 @@ function MCOptionsPanel({ meta, onChange, onClose }: {
               </div>
             </div>
 
-            {/* Row 2: flagged checkbox + score + delete */}
-            <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-3 py-2">
+            {/* Row 2: flagged + score + delete */}
+            <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-3 py-1.5">
               <label className="flex cursor-pointer items-center gap-1.5">
                 <input type="checkbox" checked={item.is_flagged} onChange={e => update(item.id, { is_flagged: e.target.checked })}
                   className="h-3.5 w-3.5 rounded border-gray-300 accent-red-500" />
-                <span className="text-xs font-medium text-gray-600">Mark as flagged</span>
-                {item.is_flagged && <span className="text-xs">🚩</span>}
+                <span className={`text-xs font-medium ${item.is_flagged ? "text-red-600" : "text-gray-500"}`}>
+                  {item.is_flagged ? "Marked as flagged" : "Mark as flagged"}
+                </span>
               </label>
-              <div className="flex items-center gap-2">
-                {scoring && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-gray-500">Score:</span>
-                    <input type="number" placeholder="—" value={item.score ?? ""}
+              <div className="flex items-center gap-1.5">
+                {scoring ? (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-400">Score:</span>
+                    <input type="number" placeholder="/" value={item.score ?? ""}
                       onChange={e => update(item.id, { score: e.target.value === "" ? null : Number(e.target.value) })}
-                      className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-xs text-center outline-none focus:border-brand-400 transition" />
+                      className="w-14 rounded-lg border border-gray-200 px-1.5 py-0.5 text-xs text-center outline-none focus:border-brand-400 transition" />
                   </div>
+                ) : (
+                  <span className="text-xs text-gray-400">
+                    Score: {item.score !== null && item.score !== undefined ? item.score : "/"}
+                  </span>
                 )}
                 <button onClick={() => remove(item.id)}
-                  className="rounded-md p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 transition" title="Remove">
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                  className="rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500 transition">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 </button>
               </div>
             </div>
@@ -395,15 +369,15 @@ function MCOptionsPanel({ meta, onChange, onClose }: {
         ))}
 
         <button onClick={add}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-gray-300 py-3 text-sm font-medium text-gray-500 transition hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700">
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-gray-300 py-2.5 text-sm font-medium text-gray-500 transition hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-          Add Response
+          + Add Response
         </button>
       </div>
 
       {/* Footer */}
-      <div className="flex gap-2 border-t border-gray-100 px-5 py-3.5">
-        <button onClick={onClose}
+      <div className="flex gap-2 border-t border-gray-100 px-4 py-3">
+        <button onClick={onBack ?? onClose}
           className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50">
           Cancel
         </button>
@@ -411,6 +385,87 @@ function MCOptionsPanel({ meta, onChange, onClose }: {
           className="flex-1 rounded-lg bg-brand-700 py-2 text-sm font-semibold text-white transition hover:bg-brand-800">
           Save and apply
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── MC Library Panel ─────────────────────────────────────────────────────────
+
+function MCLibraryPanel({ question, onApplyAndEdit, onEditCurrent, onClose }: {
+  question: Question;
+  onApplyAndEdit: (meta: OptionMeta[]) => void;
+  onEditCurrent: () => void;
+  onClose: () => void;
+}) {
+  const hasOptions = (question.option_meta?.length ?? 0) > 0;
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+        <p className="font-display text-sm font-semibold text-gray-900">Multiple choice responses</p>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => onApplyAndEdit(defaultOptionMeta())}
+            className="flex items-center gap-1 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition">
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+            Responses
+          </button>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {/* Current options */}
+        {hasOptions && (
+          <div className="border-b border-gray-100 px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Current</p>
+              <button onClick={onEditCurrent}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 transition">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                Edit
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {question.option_meta!.map(m => (
+                <span key={m.id} className={`rounded-full px-2 py-0.5 text-xs font-medium ${chipClass(m.color)}`}>{m.label}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Presets */}
+        <div className="px-4 pt-3 pb-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Preset response sets</p>
+        </div>
+        {MC_PRESETS.map(preset => (
+          <div key={preset.label}
+            className="group flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition cursor-pointer"
+            onClick={() => {
+              const meta: OptionMeta[] = preset.opts.map(o => ({ id: uid(), label: o.label, color: o.color, is_flagged: o.is_flagged, score: null }));
+              onApplyAndEdit(meta);
+            }}>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-1">
+                {preset.opts.slice(0, 3).map(o => {
+                  const cc = OPT_COLORS.find(c => c.v === o.color);
+                  return (
+                    <span key={o.label} className={`rounded-full px-2 py-0.5 text-xs font-medium ${cc?.chip ?? "bg-gray-100 text-gray-600"}`}>
+                      {o.label}
+                    </span>
+                  );
+                })}
+                {preset.opts.length > 3 && (
+                  <span className="text-xs text-gray-400">+{preset.opts.length - 3}</span>
+                )}
+              </div>
+            </div>
+            <svg className="h-4 w-4 shrink-0 text-gray-300 group-hover:text-brand-500 transition" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1050,7 +1105,7 @@ function ControlBar({ question, isTitlePage, onUpdate, onSetPanel }: {
   onSetPanel: (p: RightPanelState) => void;
 }) {
   const t = question.type;
-  const hasLogic = !isTitlePage && ["person", "document_number", "multiple_choice", "text", "number", "checkbox", "slider", "signature"].includes(t);
+  const hasLogic = ["multiple_choice", "text", "number", "checkbox", "slider", "signature", "person", "document_number"].includes(t);
 
   function addLogicRule() {
     const rule: LogicRule = { id: uid(), op: "is" as LogicOp, value: "", trigger: "ask_questions" };
@@ -1193,9 +1248,15 @@ function QuestionRow({ question, isTitlePage, isActive, scoreEnabled, onUpdate, 
 
   function changeType(t: ResponseType) {
     const patch: Partial<Question> = { type: t };
-    if (t === "multiple_choice" && !question.option_meta?.length) {
-      const meta = defaultOptionMeta();
-      patch.option_meta = meta; patch.options = meta.map(m => m.label);
+    if (t === "multiple_choice") {
+      if (!question.option_meta?.length) {
+        const meta = defaultOptionMeta();
+        patch.option_meta = meta; patch.options = meta.map(m => m.label);
+      }
+      onUpdate(syncOptionArrays({ ...question, ...patch }));
+      setShowType(false);
+      onSetPanel({ type: "mc_library" });
+      return;
     }
     if (t === "table" && !question.table_columns?.length) {
       patch.table_columns = defaultTableColumns();
@@ -1204,8 +1265,8 @@ function QuestionRow({ question, isTitlePage, isActive, scoreEnabled, onUpdate, 
     setShowType(false);
   }
 
-  function applyPreset(presetMeta: OptionMeta[]) {
-    onUpdate(syncOptionArrays({ ...question, type: "multiple_choice", option_meta: presetMeta }));
+  function applyPresetMeta(meta: OptionMeta[]) {
+    onUpdate(syncOptionArrays({ ...question, type: "multiple_choice", option_meta: meta }));
   }
 
   function updateRule(id: string, r: LogicRule) {
@@ -1231,12 +1292,13 @@ function QuestionRow({ question, isTitlePage, isActive, scoreEnabled, onUpdate, 
   function TypeBadge() {
     if (question.type === "multiple_choice" && question.option_meta?.length) {
       return (
-        <div className="flex flex-wrap gap-1">
+        <button onClick={e => { e.stopPropagation(); onSetPanel({ type: "mc_library" }); }}
+          className="flex flex-wrap gap-1 text-left hover:opacity-80 transition" title="Edit responses">
           {question.option_meta.slice(0, 3).map(m => (
             <span key={m.id} className={`rounded-full px-2 py-0.5 text-xs font-medium ${chipClass(m.color)}`}>{m.label}</span>
           ))}
           {question.option_meta.length > 3 && <span className="text-xs text-gray-500">+{question.option_meta.length - 3}</span>}
-        </div>
+        </button>
       );
     }
     const found = [...TITLE_TYPES, ...INSPECT_TYPES].find(x => x.value === question.type);
@@ -1254,8 +1316,12 @@ function QuestionRow({ question, isTitlePage, isActive, scoreEnabled, onUpdate, 
       {/* Main row */}
       <div className="flex items-start" onClick={onActivate}>
         {/* Drag handle */}
-        <div className="flex w-8 shrink-0 items-center justify-center pt-3 text-gray-300 opacity-0 group-hover:opacity-100 transition cursor-grab">
-          <span className="text-sm leading-none select-none">⠿</span>
+        <div className="flex w-9 shrink-0 items-center justify-center pt-3 opacity-20 group-hover:opacity-100 transition cursor-grab active:cursor-grabbing">
+          <svg className="h-5 w-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+            <circle cx="6.5" cy="4.5" r="1.5" /><circle cx="13.5" cy="4.5" r="1.5" />
+            <circle cx="6.5" cy="10" r="1.5" /><circle cx="13.5" cy="10" r="1.5" />
+            <circle cx="6.5" cy="15.5" r="1.5" /><circle cx="13.5" cy="15.5" r="1.5" />
+          </svg>
         </div>
 
         {/* Question cell */}
@@ -1296,8 +1362,7 @@ function QuestionRow({ question, isTitlePage, isActive, scoreEnabled, onUpdate, 
             </button>
             {showType && (
               <TypePickerPanel isTitlePage={isTitlePage} current={question.type}
-                onSelect={changeType} onClose={() => setShowType(false)}
-                onSelectPreset={applyPreset} />
+                onSelect={changeType} onClose={() => setShowType(false)} />
             )}
           </div>
         </div>
@@ -1340,7 +1405,7 @@ function QuestionRow({ question, isTitlePage, isActive, scoreEnabled, onUpdate, 
       </div>
 
       {/* Logic rules inline */}
-      {!isTitlePage && (question.logic_rules ?? []).length > 0 && (
+      {(question.logic_rules ?? []).length > 0 && (
         <div className="pl-8 pr-4 pb-2">
           {(question.logic_rules ?? []).map(rule => (
             <LogicRuleRow key={rule.id} rule={rule} question={question} isTitlePage={isTitlePage}
@@ -1850,7 +1915,16 @@ export default function TemplateBuilderPage({ user: _user, onLogout: _onLogout }
         {/* ── Right Panel ── */}
         {globalPanel && panelQ && (
           <div className="w-80 shrink-0 overflow-hidden border-l border-brand-100 bg-white shadow-card animate-in slide-in-from-right duration-200">
-            {globalPanel.panel?.type === "mc" ? (
+            {globalPanel.panel?.type === "mc_library" ? (
+              <MCLibraryPanel
+                question={panelQ}
+                onApplyAndEdit={meta => {
+                  updatePanelQuestion(panelQ.id, syncOptionArrays({ ...panelQ, type: "multiple_choice", option_meta: meta }));
+                  setGlobalPanel({ qId: panelQ.id, panel: { type: "mc" } });
+                }}
+                onEditCurrent={() => setGlobalPanel({ qId: panelQ.id, panel: { type: "mc" } })}
+                onClose={() => setGlobalPanel(null)} />
+            ) : globalPanel.panel?.type === "mc" ? (
               <MCOptionsPanel
                 meta={panelQ.option_meta ?? defaultOptionMeta()}
                 onChange={meta => {
@@ -1860,6 +1934,7 @@ export default function TemplateBuilderPage({ user: _user, onLogout: _onLogout }
                     score_map: Object.fromEntries(meta.map(m => [m.label, m.score])),
                   });
                 }}
+                onBack={() => setGlobalPanel({ qId: panelQ.id, panel: { type: "mc_library" } })}
                 onClose={() => setGlobalPanel(null)} />
             ) : globalPanel.panel?.type === "table" ? (
               <TableColumnsPanel
