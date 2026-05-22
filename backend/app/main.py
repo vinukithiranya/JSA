@@ -10,6 +10,7 @@ from app.models import db_models  # noqa: F401
 from app.routers import analytics, teams, actions, notifications, audit
 from app.routers import auth, dashboard, documents, forms, jsa, sync, templates
 from app.routers import issues, scheduling, inspections
+from app.routers import assets, contractors, investigations, headsup, credentials
 from app.services.seed import seed_defaults
 
 
@@ -33,6 +34,8 @@ async def lifespan(_app: FastAPI):
     _run_migration("ALTER TABLE actions ADD COLUMN linked_issue_id VARCHAR(64)")
     _run_migration("ALTER TABLE actions ADD COLUMN linked_jsa_id VARCHAR(64)")
     _run_migration("ALTER TABLE actions ADD COLUMN created_by VARCHAR(64) DEFAULT 'u-tech'")
+    _run_migration("ALTER TABLE notifications ADD COLUMN event_type VARCHAR(50) DEFAULT 'info'")
+    _run_migration("ALTER TABLE notifications ADD COLUMN link VARCHAR(500) DEFAULT ''")
     with SessionLocal() as db:
         seed_defaults(db)
     yield
@@ -69,6 +72,11 @@ app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(issues.router, prefix="/api/issues", tags=["issues"])
 app.include_router(scheduling.router, prefix="/api/schedules", tags=["schedules"])
 app.include_router(inspections.router, prefix="/api/inspections", tags=["inspections"])
+app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
+app.include_router(contractors.router, prefix="/api/contractors", tags=["contractors"])
+app.include_router(investigations.router, prefix="/api/investigations", tags=["investigations"])
+app.include_router(headsup.router, prefix="/api/headsup", tags=["headsup"])
+app.include_router(credentials.router, prefix="/api/credentials", tags=["credentials"])
 
 Path("storage").mkdir(parents=True, exist_ok=True)
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")

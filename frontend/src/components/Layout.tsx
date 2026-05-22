@@ -1,6 +1,7 @@
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { User } from "../types";
+import { notificationsApi, type Notification } from "../api";
 
 interface LayoutProps {
   user: User | null;
@@ -82,6 +83,11 @@ const Ico = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
     </svg>
   ),
+  Analytics: () => (
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  ),
 };
 
 // ── Nav config ────────────────────────────────────────────────────────────────
@@ -90,22 +96,140 @@ type NavItem = { to: string; label: string; Icon: () => JSX.Element };
 
 const NAV: NavItem[] = [
   { to: "/dashboard",   label: "Home",         Icon: Ico.Home      },
+  { to: "/analytics",   label: "Analytics",    Icon: Ico.Analytics },
   { to: "/templates",   label: "Templates",    Icon: Ico.Template  },
   { to: "/inspections", label: "Inspections",  Icon: Ico.Clipboard },
-  // { to: "/scheduling",  label: "Schedules",    Icon: Ico.Calendar  },  // hidden
-  { to: "/actions",     label: "Actions",      Icon: Ico.Check     },
   { to: "/issues",      label: "Issues",       Icon: Ico.Alert     },
-  { to: "/documents",   label: "Documents",    Icon: Ico.Document  },
-  // { to: "/training",    label: "Training",     Icon: Ico.Training  },  // hidden
+  { to: "/actions",     label: "Actions",      Icon: Ico.Check     },
   { to: "/assets",      label: "Assets",       Icon: Ico.Box       },
-  // { to: "/contractors", label: "Contractors",  Icon: Ico.Users     },  // hidden
+  { to: "/documents",   label: "Documents",    Icon: Ico.Document  },
   { to: "/sync",        label: "Offline Sync", Icon: Ico.Sync      },
 ];
 
 const SUP_NAV: NavItem[] = [
   { to: "/supervisor", label: "Approval Queue", Icon: Ico.Shield },
-  { to: "/forms",      label: "Form Builder",   Icon: Ico.Grid   },
 ];
+
+// ── Notification Bell ─────────────────────────────────────────────────────────
+
+function NotificationBell({ user }: { user: User | null }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unread, setUnread] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const fetchCount = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { count } = await notificationsApi.unreadCount(user.id);
+      setUnread(count);
+    } catch { /* silent */ }
+  }, [user]);
+
+  useEffect(() => {
+    fetchCount();
+    const timer = setInterval(fetchCount, 30_000);
+    return () => clearInterval(timer);
+  }, [fetchCount]);
+
+  async function openPanel() {
+    if (!user) return;
+    setOpen(v => !v);
+    if (!open) {
+      try {
+        const list = await notificationsApi.list(user.id);
+        setNotifications(list);
+        setUnread(0);
+      } catch { /* silent */ }
+    }
+  }
+
+  async function handleMarkRead(id: string) {
+    await notificationsApi.markRead(id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+  }
+
+  async function handleMarkAll() {
+    if (!user) return;
+    await notificationsApi.markAllRead(user.id);
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+  }
+
+  function handleClick(n: Notification) {
+    if (!n.is_read) handleMarkRead(n.id);
+    if (n.link) { navigate(n.link); setOpen(false); }
+  }
+
+  // Close on outside click
+  useEffect(() => {
+    function onOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, []);
+
+  const dotColor: Record<string, string> = {
+    critical: "bg-red-500",
+    warning:  "bg-amber-400",
+    success:  "bg-green-500",
+    info:     "bg-sky-400",
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={openPanel}
+        className="relative flex h-8 w-8 items-center justify-center rounded-lg text-brand-500 transition hover:bg-brand-50 hover:text-brand-800"
+        aria-label="Notifications"
+      >
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        {unread > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-10 z-50 w-80 overflow-hidden rounded-xl border border-brand-100 bg-white shadow-xl">
+          <div className="flex items-center justify-between border-b border-brand-100 px-4 py-2.5">
+            <p className="text-xs font-bold uppercase tracking-wider text-brand-600">Notifications</p>
+            {notifications.some(n => !n.is_read) && (
+              <button onClick={handleMarkAll} className="text-xs text-brand-500 hover:text-brand-800">
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div className="max-h-96 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <p className="py-8 text-center text-sm text-brand-400">No notifications</p>
+            ) : (
+              notifications.map(n => (
+                <button
+                  key={n.id}
+                  onClick={() => handleClick(n)}
+                  className={`flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-brand-50 ${n.is_read ? "opacity-60" : ""}`}
+                >
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotColor[n.event_type] ?? "bg-sky-400"} ${n.is_read ? "opacity-0" : ""}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs leading-relaxed text-brand-800">{n.message}</p>
+                    <p className="mt-0.5 text-[10px] text-brand-400">
+                      {new Date(n.created_at).toLocaleString("en-AU", { dateStyle: "short", timeStyle: "short" })}
+                    </p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -188,8 +312,9 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
 
       {/* ── Main ─────────────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center border-b border-brand-100 bg-white px-6">
+        <header className="flex h-14 items-center justify-between border-b border-brand-100 bg-white px-6">
           <h1 className="font-display text-base font-semibold text-brand-900">{title}</h1>
+          <NotificationBell user={user} />
         </header>
         <main className="flex-1 overflow-auto px-6 py-5">{children}</main>
       </div>

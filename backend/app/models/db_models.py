@@ -212,8 +212,10 @@ class NotificationDB(Base):
     __tablename__ = "notifications"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), default="info")
+    link: Mapped[str] = mapped_column(String(500), default="")
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -227,3 +229,86 @@ class AuditLogDB(Base):
     resource: Mapped[str] = mapped_column(String(255), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     details: Mapped[dict] = mapped_column(JSON, default={})
+
+
+class AssetDB(Base):
+    __tablename__ = "assets"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    asset_number: Mapped[str] = mapped_column(String(100), default="")
+    asset_type: Mapped[str] = mapped_column(String(100), default="Equipment")
+    make: Mapped[str] = mapped_column(String(255), default="")
+    model_name: Mapped[str] = mapped_column(String(255), default="")
+    serial_number: Mapped[str] = mapped_column(String(100), default="")
+    site: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[str] = mapped_column(String(50), default="active")
+    description: Mapped[str] = mapped_column(Text, default="")
+    readings: Mapped[list] = mapped_column(JSON, default=[])
+    created_by: Mapped[str] = mapped_column(String(64), default="u-admin")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ContractorDB(Base):
+    __tablename__ = "contractors"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    company_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    contact_name: Mapped[str] = mapped_column(String(255), default="")
+    contact_email: Mapped[str] = mapped_column(String(255), default="")
+    contact_phone: Mapped[str] = mapped_column(String(50), default="")
+    abn: Mapped[str] = mapped_column(String(50), default="")
+    status: Mapped[str] = mapped_column(String(50), default="active")
+    trade_type: Mapped[str] = mapped_column(String(100), default="")
+    site: Mapped[str] = mapped_column(String(255), default="")
+    documents: Mapped[list] = mapped_column(JSON, default=[])
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class InvestigationDB(Base):
+    __tablename__ = "investigations"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    incident_date: Mapped[date] = mapped_column(Date, nullable=False)
+    incident_type: Mapped[str] = mapped_column(String(100), default="near_miss")
+    severity: Mapped[str] = mapped_column(String(50), default="medium")
+    site: Mapped[str] = mapped_column(String(255), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    involved_parties: Mapped[list] = mapped_column(JSON, default=[])
+    immediate_actions: Mapped[str] = mapped_column(Text, default="")
+    root_causes: Mapped[list] = mapped_column(JSON, default=[])
+    corrective_actions: Mapped[list] = mapped_column(JSON, default=[])
+    media_urls: Mapped[list] = mapped_column(JSON, default=[])
+    linked_issue_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    linked_inspection_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), default="open")
+    created_by: Mapped[str] = mapped_column(String(64), default="u-admin")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class HeadsUpDB(Base):
+    __tablename__ = "headsup"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="")
+    author_id: Mapped[str] = mapped_column(String(64), default="u-admin")
+    author_name: Mapped[str] = mapped_column(String(255), default="")
+    sites: Mapped[list] = mapped_column(JSON, default=[])
+    attachments: Mapped[list] = mapped_column(JSON, default=[])
+    acknowledgments: Mapped[list] = mapped_column(JSON, default=[])
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CredentialDB(Base):
+    __tablename__ = "credentials"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    user_name: Mapped[str] = mapped_column(String(255), default="")
+    credential_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    credential_number: Mapped[str] = mapped_column(String(100), default="")
+    issuing_authority: Mapped[str] = mapped_column(String(255), default="")
+    issued_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    file_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

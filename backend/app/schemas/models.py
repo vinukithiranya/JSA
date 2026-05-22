@@ -363,12 +363,16 @@ class InspectionOut(BaseModel):
 class NotificationCreate(BaseModel):
     user_id: str
     message: str
+    event_type: str = "info"
+    link: str = ""
 
 
 class NotificationOut(BaseModel):
     id: str
     user_id: str
     message: str
+    event_type: str = "info"
+    link: str = ""
     is_read: bool
     created_at: datetime
 

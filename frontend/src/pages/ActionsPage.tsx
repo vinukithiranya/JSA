@@ -390,8 +390,22 @@ export default function ActionsPage({ user, onLogout }: Props) {
                     Due: <span className="font-medium">{new Date(selected.due_date).toLocaleDateString()}</span>
                   </p>
                 )}
-                {selected.linked_issue_id && <p className="text-brand-500">Issue: <span className="font-medium text-brand-800">{selected.linked_issue_id}</span></p>}
-                {selected.linked_jsa_id && <p className="text-brand-500">JSA: <span className="font-medium text-brand-800">{selected.linked_jsa_id}</span></p>}
+                {selected.linked_issue_id && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-brand-500">Raised from Issue:</span>
+                    <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">
+                      {selected.linked_issue_id}
+                    </span>
+                  </div>
+                )}
+                {selected.linked_jsa_id && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-brand-500">Linked JSA:</span>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                      {selected.linked_jsa_id}
+                    </span>
+                  </div>
+                )}
                 {selected.labels.length > 0 && (
                   <div className="flex flex-wrap gap-1 pt-1">
                     {selected.labels.map((l) => (

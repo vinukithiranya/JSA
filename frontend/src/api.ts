@@ -45,3 +45,24 @@ export type ActionsSummary = {
   by_status: Record<string, number>;
   by_priority: Record<string, number>;
 };
+
+export type Notification = {
+  id: string;
+  user_id: string;
+  message: string;
+  event_type: "info" | "warning" | "critical" | "success";
+  link: string;
+  is_read: boolean;
+  created_at: string;
+};
+
+export const notificationsApi = {
+  list: (userId: string) =>
+    api<Notification[]>(`/api/notifications?user_id=${encodeURIComponent(userId)}`),
+  unreadCount: (userId: string) =>
+    api<{ count: number }>(`/api/notifications/unread-count?user_id=${encodeURIComponent(userId)}`),
+  markRead: (id: string) =>
+    api<Notification>(`/api/notifications/${id}/read`, { method: "PATCH" }),
+  markAllRead: (userId: string) =>
+    api<{ ok: boolean }>(`/api/notifications/mark-all-read?user_id=${encodeURIComponent(userId)}`, { method: "POST" }),
+};
