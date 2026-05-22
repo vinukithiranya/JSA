@@ -1,5 +1,4 @@
-// Empty string = same origin (proxied via Vite dev server or Nginx)
-const API_BASE = "";
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem("rigpro_token");
