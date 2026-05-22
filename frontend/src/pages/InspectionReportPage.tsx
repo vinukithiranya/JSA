@@ -225,7 +225,13 @@ export default function InspectionReportPage({ user, onLogout }: Props) {
                           <p className="mt-0.5 text-xs italic text-brand-400">Note: {ans.note}</p>
                         )}
                         {ans?.media_urls?.length > 0 && (
-                          <p className="mt-0.5 text-xs text-brand-400">📎 {ans.media_urls.length} attachment{ans.media_urls.length > 1 ? "s" : ""}</p>
+                          <div className="mt-2 flex gap-2">
+                            {ans.media_urls.map((u, idx) => (
+                              <a key={idx} href={u} target="_blank" rel="noreferrer">
+                                <img src={u} alt={`attachment-${idx}`} className="h-16 w-16 rounded object-cover border" />
+                              </a>
+                            ))}
+                          </div>
                         )}
                       </div>
                       <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${

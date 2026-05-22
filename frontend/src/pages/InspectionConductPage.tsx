@@ -318,21 +318,68 @@ function DateTimeAnswerInput({ value, onChange, includeDate = true, includeTime 
 }
 
 function MediaAnswerInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [previewLocal, setPreviewLocal] = useState<string | null>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setPreviewLocal(URL.createObjectURL(f));
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("category", "Inspection Media");
+      fd.append("folder", "media");
+      fd.append("description", "Uploaded from inspection");
+
+      const res = await fetch("/api/documents/upload", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("upload failed");
+      const data = await res.json();
+      const url = `/${data.file_path.replace(/\\/g, "/")}`;
+      onChange([...value, url]);
+    } catch (err) {
+      // silently fail for now
+    } finally {
+      setUploading(false);
+      setPreviewLocal(null);
+      if (e.target) e.target.value = "";
+    }
+  }
+
   return (
     <div>
-      <button onClick={() => { const url = prompt("Enter file URL (demo):"); if (url) onChange([...value, url]); }}
-        className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-        Add media
-      </button>
+      <label className="inline-block">
+        <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+        <button className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Add media
+        </button>
+      </label>
+
+      {uploading && (
+        <div className="mt-2 text-sm text-gray-500">Uploading…</div>
+      )}
+
+      {previewLocal && (
+        <div className="mt-2">
+          <img src={previewLocal} alt="preview" className="h-28 w-28 rounded object-cover" />
+        </div>
+      )}
+
       {value.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {value.map((url, i) => (
-            <div key={i} className="flex items-center gap-1.5 rounded-lg bg-brand-100 px-2.5 py-1 text-xs text-brand-700">
-              📎 {url.length > 25 ? url.slice(0, 25) + "…" : url}
-              <button onClick={() => onChange(value.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">✕</button>
+            <div key={i} className="relative">
+              <a href={url} target="_blank" rel="noreferrer">
+                <img src={url} alt={`attachment-${i}`} className="h-20 w-20 rounded object-cover" />
+              </a>
+              <button onClick={() => onChange(value.filter((_, j) => j !== i))}
+                className="absolute -top-2 -right-2 rounded-full bg-white p-1 text-red-500 shadow">
+                ✕
+              </button>
             </div>
           ))}
         </div>

@@ -32,6 +32,28 @@ def _sig_image(data_url: str) -> Image | None:
         return None
 
 
+def _image_from_url(url: str, max_width: float = 4.5 * inch, max_height: float = 3.0 * inch) -> Image | None:
+    try:
+        if not url:
+            return None
+        # data URL
+        if url.startswith("data:"):
+            b64 = url.split(",", 1)[1] if "," in url else url
+            raw = base64.b64decode(b64)
+            return Image(BytesIO(raw), width=max_width, height=max_height)
+
+        # file path served under /storage or direct path
+        path = url.lstrip("/") if url.startswith("/") else url
+        p = Path(path)
+        if p.exists():
+            raw = p.read_bytes()
+            return Image(BytesIO(raw), width=max_width, height=max_height)
+
+        return None
+    except Exception:
+        return None
+
+
 def generate_jsa_pdf(jsa: JsaRecord) -> bytes:
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -226,6 +248,29 @@ def generate_jsa_pdf(jsa: JsaRecord) -> bytes:
         f"Record ID: {jsa.id}",
         footer_style,
     ))
+
+    # ── Attachments (images) ──────────────────────────────────────────────────
+    try:
+        attachments = []
+        answers = getattr(jsa, "answers", {}) or {}
+        for qid, ans in (answers.items() if isinstance(answers, dict) else []):
+            # ans may be a dict with media_urls
+            if isinstance(ans, dict):
+                for m in ans.get("media_urls", []) or []:
+                    img = _image_from_url(m)
+                    if img:
+                        attachments.append((qid, m, img))
+
+        if attachments:
+            elements.append(Spacer(1, 0.15 * inch))
+            elements.append(Paragraph("Attachments", heading_style))
+            for qid, src, img in attachments:
+                elements.append(Paragraph(f"Question: {qid}", label_style))
+                elements.append(img)
+                elements.append(Spacer(1, 0.05 * inch))
+    except Exception:
+        # don't let attachments break PDF generation
+        pass
 
     doc.build(elements)
     data = buffer.getvalue()
