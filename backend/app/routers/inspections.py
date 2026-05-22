@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models.db_models import InspectionRecordDB, TemplateDB
+from app.models.db_models import InspectionRecordDB, IssueDB, TemplateDB
 from app.schemas.models import (
     InspectionAnswersUpdate,
     InspectionCompleteRequest,
     InspectionOut,
     InspectionStart,
 )
+from app.services.notifications import notify_supervisors
 from app.services.store import new_id
 
 router = APIRouter()
@@ -24,21 +25,28 @@ def _count_questions(form_schema: dict) -> int:
 
 
 def _calc_score(form_schema: dict, answers: dict) -> float:
-    """Return 0-100 percentage based on non-flagged answered questions."""
-    total = 0
-    passed = 0
+    """Return 0–100 based on earned score_map points vs maximum possible points."""
+    earned = 0.0
+    max_pts = 0.0
     for section in form_schema.get("sections", []):
         for q in section.get("questions", []):
-            qid = q["id"]
-            if q.get("type") == "multiple_choice" and q.get("score_map"):
-                total += 1
-                ans = answers.get(qid, {})
-                val = ans.get("value") if isinstance(ans, dict) else None
-                score = q["score_map"].get(str(val), 0) if val is not None else 0
-                passed += score if score else 0
-    if total == 0:
+            if q.get("type") != "multiple_choice" or not q.get("score_map"):
+                continue
+            score_map = q["score_map"]
+            valid = [v for v in score_map.values() if isinstance(v, (int, float)) and v is not None]
+            if not valid:
+                continue
+            q_max = max(valid)
+            max_pts += q_max
+            ans = answers.get(q["id"], {})
+            val = ans.get("value") if isinstance(ans, dict) else None
+            if val is not None:
+                pts = score_map.get(str(val))
+                if isinstance(pts, (int, float)):
+                    earned += pts
+    if max_pts == 0:
         return 100.0
-    return round((passed / total) * 100, 1)
+    return round((earned / max_pts) * 100, 1)
 
 
 def _to_out(row: InspectionRecordDB) -> InspectionOut:
@@ -177,6 +185,56 @@ def complete_inspection(
     row.completed_at = datetime.now(timezone.utc)
     row.score = score
     row.flagged_items = [item.model_dump() for item in payload.flagged_items]
+
+    # Auto-create an Issue for each non-skipped flagged item
+    active_flags = [f for f in payload.flagged_items if not f.skipped]
+    for flagged in active_flags:
+        db.add(IssueDB(
+            id=new_id("iss"),
+            title=f"Flagged: {flagged.question_text}",
+            description=(
+                f"Flagged response during inspection '{row.template_name}'.\n"
+                f"Answer given: {flagged.answer_value}\n"
+                f"Note: {flagged.note or '(none)'}"
+            ),
+            issue_type="hazard",
+            category="Inspection Flag",
+            site=row.site or "",
+            priority="high",
+            status="open",
+            reported_by=row.conducted_by,
+            media_urls=[],
+            custom_answers={},
+        ))
+
+    # Notify supervisors based on score and flags
+    site_label = f" — {row.site}" if row.site else ""
+    flag_count = len(active_flags)
+
+    if score < 70:
+        notify_supervisors(
+            db,
+            f"Critical inspection score: {score}% on '{row.template_name}'{site_label}. "
+            f"{flag_count} flagged item{'s' if flag_count != 1 else ''} auto-raised as issues.",
+            event_type="critical",
+            link=f"/inspections/report/{row.id}",
+        )
+    elif flag_count > 0:
+        notify_supervisors(
+            db,
+            f"Inspection completed with {flag_count} flagged item{'s' if flag_count != 1 else ''} — "
+            f"'{row.template_name}'{site_label}. Score: {score}%",
+            event_type="warning",
+            link=f"/inspections/report/{row.id}",
+        )
+    else:
+        notify_supervisors(
+            db,
+            f"Inspection completed — '{row.template_name}'{site_label}. Score: {score}%",
+            event_type="info",
+            link=f"/inspections/report/{row.id}",
+        )
+
     db.commit()
     db.refresh(row)
     return _to_out(row)
@@ -222,4 +280,3 @@ def delete_inspection(inspection_id: str, db: Session = Depends(get_db)) -> None
         raise HTTPException(status_code=404, detail="Inspection not found")
     db.delete(row)
     db.commit()
-

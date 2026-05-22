@@ -5,21 +5,18 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import ReviewPage from "./pages/ReviewPage";
 import SupervisorPage from "./pages/SupervisorPage";
-import FormBuilderPage from "./pages/FormBuilderPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import SyncPage from "./pages/SyncPage";
 import IssuesPage from "./pages/IssuesPage";
 import ActionsPage from "./pages/ActionsPage";
-import SchedulingPage from "./pages/SchedulingPage";
 import InspectionsPage from "./pages/InspectionsPage";
 import InspectionConductPage from "./pages/InspectionConductPage";
 import InspectionReportPage from "./pages/InspectionReportPage";
 import JsaReportPage from "./pages/JsaReportPage";
 import TemplatesPage from "./pages/TemplatesPage";
 import TemplateBuilderPage from "./pages/TemplateBuilderPage";
-import TrainingPage from "./pages/TrainingPage";
 import AssetsPage from "./pages/AssetsPage";
-import ContractorsPage from "./pages/ContractorsPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -32,7 +29,7 @@ export default function App() {
       <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LoginPage onLogin={setUser} />} />
       <Route path="/dashboard"               element={user ? <DashboardPage          user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
 
-      {/* Inspections (replaces JSA wizard) */}
+      {/* Inspections */}
       <Route path="/inspections"             element={user ? <InspectionsPage        user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/inspections/conduct/:id" element={user ? <InspectionConductPage  user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/inspections/report/:id"  element={user ? <InspectionReportPage   user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
@@ -42,18 +39,15 @@ export default function App() {
       <Route path="/jsa/report/:id"          element={user ? <JsaReportPage          user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
 
       <Route path="/supervisor"              element={user && isSupervisor ? <SupervisorPage  user={user} onLogout={logout} /> : <Navigate to="/dashboard" replace />} />
-      <Route path="/forms"                   element={user && isSupervisor ? <FormBuilderPage user={user} onLogout={logout} /> : <Navigate to="/dashboard" replace />} />
       <Route path="/documents"               element={user ? <DocumentsPage          user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/sync"                    element={user ? <SyncPage               user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/issues"                  element={user ? <IssuesPage             user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/actions"                 element={user ? <ActionsPage            user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
-      <Route path="/scheduling"              element={user ? <SchedulingPage         user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/templates"               element={user ? <TemplatesPage          user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/templates/new"           element={user ? <TemplateBuilderPage    user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/templates/edit/:id"      element={user ? <TemplateBuilderPage    user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
-      <Route path="/training"                element={user ? <TrainingPage           user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/assets"                  element={user ? <AssetsPage             user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
-      <Route path="/contractors"             element={user ? <ContractorsPage        user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
+      <Route path="/analytics"               element={user ? <AnalyticsPage          user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
     </Routes>
   );
 }

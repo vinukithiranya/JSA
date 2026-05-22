@@ -12,6 +12,7 @@ from app.schemas.models import (
     IssueOut,
     IssueStatusUpdate,
 )
+from app.services.notifications import notify, notify_supervisors
 from app.services.store import new_id
 
 router = APIRouter()
@@ -78,6 +79,24 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)) -> IssueOu
         linked_jsa_id=payload.linked_jsa_id,
     )
     db.add(row)
+    db.flush()
+
+    site_label = f" — {payload.site}" if payload.site else ""
+    if payload.priority == "high":
+        notify_supervisors(
+            db,
+            f"HIGH priority issue raised: '{payload.title}'{site_label}",
+            event_type="critical",
+            link="/issues",
+        )
+    else:
+        notify_supervisors(
+            db,
+            f"New issue raised: '{payload.title}'{site_label}",
+            event_type="warning",
+            link="/issues",
+        )
+
     db.commit()
     db.refresh(row)
     return _to_out(row)
@@ -98,11 +117,32 @@ def update_issue_status(
     row = db.query(IssueDB).filter(IssueDB.id == issue_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Issue not found")
+
+    old_assigned = row.assigned_to
     row.status = payload.status
+
     if payload.assigned_to:
         row.assigned_to = payload.assigned_to
+        if payload.assigned_to != old_assigned:
+            notify(
+                db,
+                payload.assigned_to,
+                f"Issue assigned to you: '{row.title}'",
+                event_type="info",
+                link="/issues",
+            )
+
     if payload.status == "resolved":
         row.resolved_at = datetime.now(timezone.utc)
+        if row.reported_by:
+            notify(
+                db,
+                row.reported_by,
+                f"Issue resolved: '{row.title}'",
+                event_type="success",
+                link="/issues",
+            )
+
     db.commit()
     db.refresh(row)
     return _to_out(row)

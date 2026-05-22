@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Local SQLite database — not for production
+*.db
+*.db-journal
+
+# Uploaded files (stored in storage/)
+storage/
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/

@@ -972,10 +972,12 @@ export default function InspectionConductPage({ user, onLogout: _onLogout }: Pro
           <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
             <div className={`rounded-t-2xl px-6 py-4 ${(inspection.flagged_items?.length ?? 0) > 0 ? "bg-red-600" : "bg-green-600"}`}>
               <h2 className="font-display text-xl font-bold text-white">
-                {(inspection.flagged_items?.length ?? 0) > 0 ? "⚑ Flagged Items Review" : "✓ Inspection Ready"}
+                {(inspection.flagged_items?.length ?? 0) > 0 ? "Flagged Items Review" : "Inspection Ready"}
               </h2>
               <p className="mt-0.5 text-sm text-white/80">
-                {(inspection.flagged_items?.length ?? 0) > 0 ? `${inspection.flagged_items.length} item${inspection.flagged_items.length !== 1 ? "s" : ""} need attention` : "No flagged items — all responses within acceptable range"}
+                {(inspection.flagged_items?.length ?? 0) > 0
+                  ? `${inspection.flagged_items.filter(f => !f.skipped).length} active flag${inspection.flagged_items.filter(f => !f.skipped).length !== 1 ? "s" : ""} — issues will be automatically raised on submit`
+                  : "No flagged items — all responses within acceptable range"}
               </p>
             </div>
             <div className="max-h-80 overflow-y-auto px-6 py-4">
@@ -997,8 +999,9 @@ export default function InspectionConductPage({ user, onLogout: _onLogout }: Pro
                         </div>
                         {!item.skipped ? (
                           <div className="flex shrink-0 flex-col gap-1.5">
-                            <button onClick={() => navigate(`/actions?prefill=${encodeURIComponent(`${item.question_text} — ${item.answer_value}`)}`)}
-                              className="whitespace-nowrap rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-800">Create action</button>
+                            <span className="whitespace-nowrap rounded-lg bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                              Issue auto-raised
+                            </span>
                             <button onClick={() => setInspection(prev => prev ? { ...prev, flagged_items: prev.flagged_items.map((f, i) => i === idx ? { ...f, skipped: true } : f) } : prev)}
                               className="whitespace-nowrap rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">Skip</button>
                           </div>

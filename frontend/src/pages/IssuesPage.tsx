@@ -42,6 +42,14 @@ const EMPTY_FORM = {
   category: "General",
   site: "",
   priority: "medium" as Priority,
+  assigned_to: "",
+};
+
+const EMPTY_ACTION_FORM = {
+  title: "",
+  assigned_to: "",
+  due_date: "",
+  priority: "medium" as Priority,
 };
 
 export default function IssuesPage({ user, onLogout }: Props) {
@@ -56,6 +64,12 @@ export default function IssuesPage({ user, onLogout }: Props) {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Create action from issue
+  const [showActionForm, setShowActionForm] = useState(false);
+  const [actionForm, setActionForm] = useState({ ...EMPTY_ACTION_FORM });
+  const [actionSaving, setActionSaving] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const load = () => {
     const params = new URLSearchParams();
@@ -87,6 +101,33 @@ export default function IssuesPage({ user, onLogout }: Props) {
       setError(e instanceof Error ? e.message : "Failed to create issue");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCreateAction = async () => {
+    if (!selected) return;
+    if (!actionForm.title.trim()) { setActionError("Title is required"); return; }
+    if (!actionForm.assigned_to.trim()) { setActionError("Assignee is required"); return; }
+    setActionSaving(true); setActionError("");
+    try {
+      await api("/api/actions", {
+        method: "POST",
+        body: JSON.stringify({
+          title: actionForm.title,
+          assigned_to: actionForm.assigned_to,
+          priority: actionForm.priority,
+          due_date: actionForm.due_date || null,
+          action_type: "corrective",
+          linked_issue_id: selected.id,
+          created_by: user?.id ?? "u-tech",
+        }),
+      });
+      setShowActionForm(false);
+      setActionForm({ ...EMPTY_ACTION_FORM });
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to create action");
+    } finally {
+      setActionSaving(false);
     }
   };
 
@@ -275,6 +316,16 @@ export default function IssuesPage({ user, onLogout }: Props) {
               </div>
 
               <div>
+                <label className="mb-1 block text-xs font-semibold text-brand-600">Assign To</label>
+                <input
+                  value={form.assigned_to}
+                  onChange={(e) => setForm((f) => ({ ...f, assigned_to: e.target.value }))}
+                  placeholder="Name of person responsible"
+                  className="w-full rounded-lg border border-brand-200 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
                 <label className="mb-1 block text-xs font-semibold text-brand-600">Description</label>
                 <textarea
                   value={form.description}
@@ -325,7 +376,7 @@ export default function IssuesPage({ user, onLogout }: Props) {
                   </span>
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} className="text-brand-400 hover:text-brand-700 text-xl">✕</button>
+              <button onClick={() => { setSelected(null); setShowActionForm(false); }} className="text-brand-400 hover:text-brand-700 text-xl">✕</button>
             </div>
 
             {/* Body */}
@@ -358,6 +409,86 @@ export default function IssuesPage({ user, onLogout }: Props) {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Create Action from Issue */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wider text-brand-500">Actions</p>
+                  {!showActionForm && (
+                    <button
+                      onClick={() => {
+                        setActionForm({ title: `Fix: ${selected.title}`, assigned_to: selected.assigned_to ?? "", due_date: "", priority: selected.priority as Priority });
+                        setShowActionForm(true);
+                      }}
+                      className="flex items-center gap-1 rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-800"
+                    >
+                      + Create Action
+                    </button>
+                  )}
+                </div>
+
+                {showActionForm && (
+                  <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 space-y-3">
+                    <p className="text-xs font-semibold text-brand-700">New action linked to this issue</p>
+                    {actionError && <p className="rounded bg-red-50 px-2 py-1 text-xs text-red-700">{actionError}</p>}
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-brand-600">What needs to be done? *</label>
+                      <input
+                        value={actionForm.title}
+                        onChange={(e) => setActionForm((f) => ({ ...f, title: e.target.value }))}
+                        className="w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-brand-600">Assign To *</label>
+                        <input
+                          value={actionForm.assigned_to}
+                          onChange={(e) => setActionForm((f) => ({ ...f, assigned_to: e.target.value }))}
+                          placeholder="Name or user"
+                          className="w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-brand-600">Due Date</label>
+                        <input
+                          type="date"
+                          value={actionForm.due_date}
+                          onChange={(e) => setActionForm((f) => ({ ...f, due_date: e.target.value }))}
+                          className="w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-brand-600">Priority</label>
+                      <select
+                        value={actionForm.priority}
+                        onChange={(e) => setActionForm((f) => ({ ...f, priority: e.target.value as Priority }))}
+                        className="w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm"
+                      >
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => { setShowActionForm(false); setActionError(""); }}
+                        className="rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleCreateAction}
+                        disabled={actionSaving}
+                        className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+                      >
+                        {actionSaving ? "Creating…" : "Create Action"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Comments */}

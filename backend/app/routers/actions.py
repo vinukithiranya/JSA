@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,7 @@ from app.schemas.models import (
     ActionOut,
     ActionStatusUpdate,
 )
+from app.services.notifications import notify
 from app.services.store import new_id
 
 router = APIRouter()
@@ -51,6 +54,18 @@ def create_action(payload: ActionCreate, db: Session = Depends(get_db)) -> Actio
         created_by=payload.created_by,
     )
     db.add(row)
+    db.flush()
+
+    if payload.assigned_to:
+        due_label = f" — due {payload.due_date}" if payload.due_date else ""
+        notify(
+            db,
+            payload.assigned_to,
+            f"Action assigned to you: '{payload.title}'{due_label}",
+            event_type="info",
+            link="/actions",
+        )
+
     db.commit()
     db.refresh(row)
     return _to_out(row)
@@ -87,6 +102,16 @@ def update_action_status(
     if not row:
         raise HTTPException(status_code=404, detail="Action not found")
     row.status = payload.status
+
+    if payload.status == "complete" and row.created_by:
+        notify(
+            db,
+            row.created_by,
+            f"Action completed: '{row.title}'",
+            event_type="success",
+            link="/actions",
+        )
+
     db.commit()
     db.refresh(row)
     return _to_out(row)
@@ -156,7 +181,6 @@ def actions_summary(db: Session = Depends(get_db)) -> dict:
     total = len(all_actions)
     by_status: dict[str, int] = {}
     by_priority: dict[str, int] = {}
-    from datetime import date
     today = date.today()
     overdue = 0
     for a in all_actions:
