@@ -83,6 +83,16 @@ const Ico = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
     </svg>
   ),
+  ChevronLeft: () => (
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+  ),
+  Menu: () => (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  ),
   Analytics: () => (
     <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -237,6 +247,7 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
   const loc = useLocation();
   const isSup = user?.role === "supervisor" || user?.role === "admin";
   const links = isSup ? [...NAV, ...SUP_NAV] : NAV;
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const initials = user?.full_name
     ?.split(" ")
@@ -248,14 +259,21 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
   return (
     <div className="flex min-h-screen bg-brand-50">
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
-      <aside className="flex w-56 shrink-0 flex-col border-r border-brand-100 bg-white">
+      <aside className={`flex shrink-0 flex-col border-r border-brand-100 bg-white transition-all duration-200 ${sidebarOpen ? "w-56" : "w-0 overflow-hidden"}`}>
         {/* Logo */}
-        <div className="flex h-14 items-center gap-2.5 border-b border-brand-100 px-4">
+        <div className="flex h-14 w-56 items-center gap-2.5 border-b border-brand-100 px-4">
           <img src={`${import.meta.env.BASE_URL}rigpro-logo.png`} alt="RigPro" className="h-8 w-auto" />
-          <div>
+          <div className="flex-1">
             <p className="text-sm font-bold leading-tight text-brand-900">RigPro</p>
             <p className="text-[10px] font-medium leading-tight text-brand-400">JSA Platform</p>
           </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-brand-400 hover:bg-brand-50 hover:text-brand-700"
+            aria-label="Collapse sidebar"
+          >
+            <Ico.ChevronLeft />
+          </button>
         </div>
 
         {/* Nav */}
@@ -313,7 +331,18 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
       {/* ── Main ─────────────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-brand-100 bg-white px-6">
-          <h1 className="font-display text-base font-semibold text-brand-900">{title}</h1>
+          <div className="flex items-center gap-3">
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-brand-500 transition hover:bg-brand-50 hover:text-brand-800"
+                aria-label="Expand sidebar"
+              >
+                <Ico.Menu />
+              </button>
+            )}
+            <h1 className="font-display text-base font-semibold text-brand-900">{title}</h1>
+          </div>
           <NotificationBell user={user} />
         </header>
         <main className="flex-1 overflow-auto px-6 py-5">{children}</main>
