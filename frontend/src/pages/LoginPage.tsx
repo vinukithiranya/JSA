@@ -42,7 +42,7 @@ export default function LoginPage({ onLogin }: Props) {
       {/* Left brand panel */}
       <div className="hidden w-80 shrink-0 flex-col justify-between bg-brand-800 p-10 lg:flex">
         <div>
-          <img src="/rigpro-logo.png" alt="RigPro" className="mb-6 h-14 w-auto brightness-0 invert" />
+          <img src={`${import.meta.env.BASE_URL}rigpro-logo.png`} alt="RigPro" className="mb-6 h-14 w-auto brightness-0 invert" />
           <h1 className="font-display text-2xl font-bold leading-snug text-white">
             Job Safety Assessment<br />Platform
           </h1>
