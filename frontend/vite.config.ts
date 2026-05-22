@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 const backendUrl = process.env.VITE_BACKEND_URL ?? "http://localhost:8000";
 
 export default defineConfig({
+  base: "/JSA/",
   plugins: [react()],
   server: {
     host: "0.0.0.0",   // listen on all interfaces (needed inside Docker)
