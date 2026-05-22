@@ -17,7 +17,7 @@ export default function SyncPage({ user, onLogout }: Props) {
     }
 
     const payload = {
-      created_by: user.id,
+      created_by: user?.id ?? "",
       items: queue,
     };
 
