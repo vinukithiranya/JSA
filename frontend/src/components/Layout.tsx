@@ -251,7 +251,7 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
       <aside className="flex w-56 shrink-0 flex-col border-r border-brand-100 bg-white">
         {/* Logo */}
         <div className="flex h-14 items-center gap-2.5 border-b border-brand-100 px-4">
-          <img src="/rigpro-logo.png" alt="RigPro" className="h-8 w-auto" />
+          <img src={`${import.meta.env.BASE_URL}rigpro-logo.png`} alt="RigPro" className="h-8 w-auto" />
           <div>
             <p className="text-sm font-bold leading-tight text-brand-900">RigPro</p>
             <p className="text-[10px] font-medium leading-tight text-brand-400">JSA Platform</p>
