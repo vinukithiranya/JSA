@@ -36,6 +36,7 @@ async def lifespan(_app: FastAPI):
     _run_migration("ALTER TABLE actions ADD COLUMN created_by VARCHAR(64) DEFAULT 'u-tech'")
     _run_migration("ALTER TABLE notifications ADD COLUMN event_type VARCHAR(50) DEFAULT 'info'")
     _run_migration("ALTER TABLE notifications ADD COLUMN link VARCHAR(500) DEFAULT ''")
+    _run_migration("ALTER TABLE inspection_records ADD COLUMN supervisor_signature TEXT")
     with SessionLocal() as db:
         seed_defaults(db)
     yield

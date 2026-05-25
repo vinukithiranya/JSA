@@ -205,6 +205,7 @@ class InspectionRecordDB(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    supervisor_signature: Mapped[str | None] = mapped_column(Text, nullable=True)
     pdf_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 

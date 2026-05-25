@@ -44,10 +44,30 @@ export type FormTemplate = {
   description: string;
   form_schema: {
     sections?: Array<{
+      id?: string;
       title?: string;
-      fields?: Array<{ id: string; type: string; label: string; required?: boolean }>;
+      questions?: Array<{ id: string; type: string; text?: string; label?: string; required?: boolean }>;
     }>;
   };
+};
+
+export type InspectionRecord = {
+  id: string;
+  template_id: string;
+  template_name: string;
+  title: string;
+  site: string;
+  conducted_by: string;
+  status: string;
+  answers: Record<string, unknown>;
+  flagged_items: unknown[];
+  score: number | null;
+  total_questions: number;
+  answered_questions: number;
+  started_at: string;
+  completed_at: string | null;
+  approved_by: string | null;
+  pdf_url: string | null;
 };
 
 export type DocumentItem = {
