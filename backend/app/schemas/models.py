@@ -339,6 +339,11 @@ class InspectionCompleteRequest(BaseModel):
     flagged_items: list[FlaggedItemIn] = Field(default_factory=list)
 
 
+class InspectionApproveRequest(BaseModel):
+    approved_by: str
+    signature: Optional[str] = None
+
+
 class InspectionOut(BaseModel):
     id: str
     template_id: str
@@ -355,6 +360,7 @@ class InspectionOut(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime]
     approved_by: Optional[str]
+    supervisor_signature: Optional[str] = None
     pdf_url: Optional[str]
 
 

@@ -123,16 +123,10 @@ export default function DashboardPage({ user, onLogout }: Props) {
               ✓ Actions
             </Link>
             <Link
-              to="/assets"
+              to="/scheduling"
               className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 py-2.5 text-sm font-semibold text-brand-800 transition-colors hover:bg-brand-50"
             >
-              📦 Assets
-            </Link>
-            <Link
-              to="/analytics"
-              className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 py-2.5 text-sm font-semibold text-brand-800 transition-colors hover:bg-brand-50"
-            >
-              📊 Analytics
+              📅 Scheduling
             </Link>
             <Link
               to="/documents"
@@ -152,6 +146,14 @@ export default function DashboardPage({ user, onLogout }: Props) {
                 className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100"
               >
                 ⊙ Approvals
+              </Link>
+            )}
+            {isSup && (
+              <Link
+                to="/forms"
+                className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 py-2.5 text-sm font-semibold text-brand-800 transition-colors hover:bg-brand-50"
+              >
+                ⊞ Form Builder
               </Link>
             )}
           </div>

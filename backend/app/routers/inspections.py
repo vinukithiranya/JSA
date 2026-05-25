@@ -1,17 +1,21 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.models.db_models import InspectionRecordDB, IssueDB, TemplateDB
 from app.schemas.models import (
     InspectionAnswersUpdate,
+    InspectionApproveRequest,
     InspectionCompleteRequest,
     InspectionOut,
     InspectionStart,
 )
 from app.services.notifications import notify_supervisors
+from app.services.pdf_service import generate_inspection_pdf
 from app.services.store import new_id
 
 router = APIRouter()
@@ -66,6 +70,7 @@ def _to_out(row: InspectionRecordDB) -> InspectionOut:
         started_at=row.started_at,
         completed_at=row.completed_at,
         approved_by=row.approved_by,
+        supervisor_signature=row.supervisor_signature,
         pdf_url=row.pdf_url,
     )
 
@@ -181,7 +186,7 @@ def complete_inspection(
     tpl = db.query(TemplateDB).filter(TemplateDB.id == row.template_id).first()
     score = _calc_score(tpl.form_schema if tpl else {}, row.answers or {})
 
-    row.status = "completed"
+    row.status = "pending_approval"
     row.completed_at = datetime.now(timezone.utc)
     row.score = score
     row.flagged_items = [item.model_dump() for item in payload.flagged_items]
@@ -245,14 +250,16 @@ def complete_inspection(
 @router.post("/{inspection_id}/approve", response_model=InspectionOut)
 def approve_inspection(
     inspection_id: str,
-    approved_by: str,
+    payload: InspectionApproveRequest,
     db: Session = Depends(get_db),
 ) -> InspectionOut:
     row = db.query(InspectionRecordDB).filter(InspectionRecordDB.id == inspection_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Inspection not found")
     row.status = "approved"
-    row.approved_by = approved_by
+    row.approved_by = payload.approved_by
+    if payload.signature:
+        row.supervisor_signature = payload.signature
     db.commit()
     db.refresh(row)
     return _to_out(row)
@@ -269,6 +276,32 @@ def get_inspection_template(inspection_id: str, db: Session = Depends(get_db)) -
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
     return {"template": tpl.form_schema, "name": tpl.name, "description": tpl.description}
+
+
+# ─── PDF Report ───────────────────────────────────────────────────────────────
+
+@router.get("/{inspection_id}/report")
+def get_inspection_report(inspection_id: str, db: Session = Depends(get_db)) -> FileResponse:
+    row = db.query(InspectionRecordDB).filter(InspectionRecordDB.id == inspection_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Inspection not found")
+
+    tpl = db.query(TemplateDB).filter(TemplateDB.id == row.template_id).first()
+    template_schema = tpl.form_schema if tpl else {"sections": []}
+
+    inspection_out = _to_out(row)
+    pdf_bytes = generate_inspection_pdf(inspection_out, template_schema)
+
+    reports_dir = Path("storage") / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    output_file = reports_dir / f"{row.id}.pdf"
+    output_file.write_bytes(pdf_bytes)
+
+    row.pdf_url = str(output_file)
+    db.commit()
+
+    safe_name = (row.title or row.template_name or "Inspection").replace(" ", "_")
+    return FileResponse(str(output_file), media_type="application/pdf", filename=f"Inspection_{safe_name}.pdf")
 
 
 # ─── Delete ───────────────────────────────────────────────────────────────────

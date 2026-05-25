@@ -345,7 +345,7 @@ export default function InspectionsPage({ user, onLogout }: Props) {
               <div className="space-y-2">
                 {filteredTpls.map((tpl) => {
                   const qCount = (tpl.form_schema.sections ?? []).reduce(
-                    (n, s) => n + (s.fields?.length ?? (s as unknown as { questions?: unknown[] }).questions?.length ?? 0),
+                    (n, s) => n + (s.questions?.length ?? 0),
                     0
                   );
                   return (

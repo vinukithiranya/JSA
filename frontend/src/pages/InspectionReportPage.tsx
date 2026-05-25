@@ -11,7 +11,7 @@ type InspectionRecord = {
   title: string;
   site: string;
   conducted_by: string;
-  status: "in_progress" | "completed" | "approved";
+  status: "in_progress" | "completed" | "pending_approval" | "approved";
   answers: Record<string, { value: unknown; note: string; is_flagged: boolean; media_urls: string[] }>;
   flagged_items: { question_id: string; question_text: string; answer_value: string; note: string; action_created: boolean; skipped: boolean }[];
   score: number | null;
@@ -20,6 +20,7 @@ type InspectionRecord = {
   started_at: string;
   completed_at: string | null;
   approved_by: string | null;
+  supervisor_signature: string | null;
 };
 
 type TemplateData = {
@@ -31,9 +32,10 @@ type TemplateData = {
 type Props = { user: User | null; onLogout: () => void };
 
 const STATUS_COLORS: Record<string, string> = {
-  in_progress: "bg-yellow-100 text-yellow-800",
-  completed:   "bg-blue-100 text-blue-700",
-  approved:    "bg-green-100 text-green-800",
+  in_progress:      "bg-yellow-100 text-yellow-800",
+  completed:        "bg-blue-100 text-blue-700",
+  pending_approval: "bg-amber-100 text-amber-800",
+  approved:         "bg-green-100 text-green-800",
 };
 
 export default function InspectionReportPage({ user, onLogout }: Props) {
@@ -56,8 +58,8 @@ export default function InspectionReportPage({ user, onLogout }: Props) {
     setApproving(true);
     try {
       const updated = await api<InspectionRecord>(
-        `/api/inspections/${id}/approve?approved_by=${user.id}`,
-        { method: "POST" }
+        `/api/inspections/${id}/approve`,
+        { method: "POST", body: JSON.stringify({ approved_by: user.full_name }) }
       );
       setInspection(updated);
     } finally {
@@ -65,7 +67,9 @@ export default function InspectionReportPage({ user, onLogout }: Props) {
     }
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    window.open(`/api/inspections/${id}/report`, "_blank");
+  };
 
   const fmt = (d: string) =>
     new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -108,7 +112,7 @@ export default function InspectionReportPage({ user, onLogout }: Props) {
           >
             🖨 Print / Export PDF
           </button>
-          {isSup && inspection.status === "completed" && (
+          {isSup && (inspection.status === "pending_approval" || inspection.status === "completed") && (
             <button
               onClick={handleApprove}
               disabled={approving}
@@ -176,6 +180,41 @@ export default function InspectionReportPage({ user, onLogout }: Props) {
             </div>
           )}
         </div>
+
+        {/* Supervisor Approval */}
+        {inspection.approved_by && (
+          <div className="border-b border-brand-100 px-6 py-5">
+            <h3 className="mb-3 font-semibold text-green-700">✓ Supervisor Approval</h3>
+            <div className="grid gap-4 text-sm sm:grid-cols-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-brand-400">Approved By</p>
+                <p className="mt-0.5 font-bold text-green-700">{inspection.approved_by}</p>
+              </div>
+              {inspection.completed_at && (
+                <div>
+                  <p className="text-xs font-semibold uppercase text-brand-400">Approval Date</p>
+                  <p className="mt-0.5 font-medium text-brand-800">{fmt(inspection.completed_at)}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-semibold uppercase text-brand-400">Status</p>
+                <p className="mt-0.5 font-bold text-green-700">APPROVED</p>
+              </div>
+            </div>
+            {inspection.supervisor_signature && (
+              <div className="mt-4">
+                <p className="mb-1 text-xs font-semibold uppercase text-brand-400">Supervisor Signature</p>
+                <div className="inline-block rounded-xl border border-brand-200 bg-white p-2 shadow-sm">
+                  <img
+                    src={inspection.supervisor_signature}
+                    alt="Supervisor signature"
+                    className="h-20 max-w-xs object-contain"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Flagged Items */}
         {flaggedCount > 0 && (

@@ -24,7 +24,7 @@ function categoryColor(cat: string): string {
 function countFields(t: FormTemplate): number {
   return (
     t.form_schema?.sections?.reduce(
-      (sum, s) => sum + (s.fields?.length ?? 0),
+      (sum, s) => sum + (s.questions?.length ?? 0),
       0
     ) ?? 0
   );
