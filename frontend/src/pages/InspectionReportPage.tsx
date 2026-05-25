@@ -68,7 +68,7 @@ export default function InspectionReportPage({ user, onLogout }: Props) {
   };
 
   const handlePrint = () => {
-    window.open(`/api/inspections/${id}/report`, "_blank");
+    window.open(`${import.meta.env.VITE_API_URL ?? ""}/api/inspections/${id}/report`, "_blank");
   };
 
   const fmt = (d: string) =>
