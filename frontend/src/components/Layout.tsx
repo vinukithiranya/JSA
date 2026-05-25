@@ -247,7 +247,14 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
   const loc = useLocation();
   const isSup = user?.role === "supervisor" || user?.role === "admin";
   const links = isSup ? [...NAV, ...SUP_NAV] : NAV;
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => localStorage.getItem("sidebarOpen") !== "false"
+  );
+
+  function toggleSidebar(open: boolean) {
+    setSidebarOpen(open);
+    localStorage.setItem("sidebarOpen", String(open));
+  }
 
   const initials = user?.full_name
     ?.split(" ")
@@ -268,7 +275,7 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
             <p className="text-[10px] font-medium leading-tight text-brand-400">JSA Platform</p>
           </div>
           <button
-            onClick={() => setSidebarOpen(false)}
+            onClick={() => toggleSidebar(false)}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-brand-400 hover:bg-brand-50 hover:text-brand-700"
             aria-label="Collapse sidebar"
           >
@@ -334,7 +341,7 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
           <div className="flex items-center gap-3">
             {!sidebarOpen && (
               <button
-                onClick={() => setSidebarOpen(true)}
+                onClick={() => toggleSidebar(true)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-brand-500 transition hover:bg-brand-50 hover:text-brand-800"
                 aria-label="Expand sidebar"
               >
