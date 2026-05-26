@@ -16,7 +16,6 @@ import JsaReportPage from "./pages/JsaReportPage";
 import TemplatesPage from "./pages/TemplatesPage";
 import TemplateBuilderPage from "./pages/TemplateBuilderPage";
 import AssetsPage from "./pages/AssetsPage";
-import AnalyticsPage from "./pages/AnalyticsPage";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -47,7 +46,7 @@ export default function App() {
       <Route path="/templates/new"           element={user ? <TemplateBuilderPage    user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/templates/edit/:id"      element={user ? <TemplateBuilderPage    user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
       <Route path="/assets"                  element={user ? <AssetsPage             user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
-      <Route path="/analytics"               element={user ? <AnalyticsPage          user={user} onLogout={logout} /> : <Navigate to="/" replace />} />
+      <Route path="/analytics"               element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

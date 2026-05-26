@@ -106,7 +106,6 @@ type NavItem = { to: string; label: string; Icon: () => JSX.Element };
 
 const NAV: NavItem[] = [
   { to: "/dashboard",   label: "Home",         Icon: Ico.Home      },
-  { to: "/analytics",   label: "Analytics",    Icon: Ico.Analytics },
   { to: "/templates",   label: "Templates",    Icon: Ico.Template  },
   { to: "/inspections", label: "Inspections",  Icon: Ico.Clipboard },
   { to: "/issues",      label: "Issues",       Icon: Ico.Alert     },
