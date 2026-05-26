@@ -193,7 +193,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
 
   return (
     <Layout user={user} title="Dashboard" onLogout={onLogout}>
-      <div className="min-h-full -m-6 p-6" style={BG_STYLE}>
+      <div className="min-h-full -mx-4 -my-4 px-4 py-4 sm:-mx-6 sm:-my-5 sm:px-6 sm:py-5" style={BG_STYLE}>
 
         {/* ── Welcome header ──────────────────────────────────── */}
         <div className="bg-gradient-to-r from-brand-700 to-brand-600 rounded-2xl p-4 mb-5 text-white flex items-center justify-between shadow-lg">
@@ -210,20 +210,22 @@ export default function DashboardPage({ user, onLogout }: Props) {
         </div>
 
         {/* ── Tab bar ─────────────────────────────────────────── */}
-        <div className="bg-white/[0.18] backdrop-blur-2xl border border-white/60 rounded-2xl p-1.5 flex gap-1 w-fit mb-5 shadow-[0_4px_20px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.85)]">
-          {tabs.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`rounded-xl px-4 py-1.5 text-sm font-semibold transition-all duration-200 ${
-                tab === t.key
-                  ? "bg-brand-600 text-white shadow-sm"
-                  : "text-brand-700 hover:bg-white/20"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="overflow-x-auto mb-5 -mx-1 px-1">
+          <div className="bg-white/[0.18] backdrop-blur-2xl border border-white/60 rounded-2xl p-1.5 flex gap-1 w-fit shadow-[0_4px_20px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.85)]">
+            {tabs.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`rounded-xl px-3 py-1.5 sm:px-4 text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                  tab === t.key
+                    ? "bg-brand-600 text-white shadow-sm"
+                    : "text-brand-700 hover:bg-white/20"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading ? <Spinner /> : (
@@ -474,7 +476,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
             ════════════════════════════════════════════════ */}
             {tab === "inspections" && inspStats && (
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[
                     { label:"Total Inspections", value: inspStats.total,                                              accent:"bg-brand-600" },
                     { label:"Average Score",      value: inspStats.average_score != null ? `${inspStats.average_score.toFixed(1)}%` : "—", accent:"bg-sky-500"   },
@@ -623,7 +625,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                   </div>
                 )}
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[
                     { label:"Total Actions", value: actionStats.total,   accent:"border-brand-400" },
                     { label:"Overdue",        value: actionStats.overdue, accent: actionStats.overdue>0?"border-red-400":"border-brand-400" },

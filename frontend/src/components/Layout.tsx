@@ -246,14 +246,21 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
   const loc = useLocation();
   const isSup = user?.role === "supervisor" || user?.role === "admin";
   const links = isSup ? [...NAV, ...SUP_NAV] : NAV;
-  const [sidebarOpen, setSidebarOpen] = useState(
-    () => localStorage.getItem("sidebarOpen") !== "false"
-  );
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const stored = localStorage.getItem("sidebarOpen");
+    if (stored !== null) return stored !== "false";
+    return typeof window !== "undefined" && window.innerWidth >= 768;
+  });
 
   function toggleSidebar(open: boolean) {
     setSidebarOpen(open);
     localStorage.setItem("sidebarOpen", String(open));
   }
+
+  // Close sidebar on mobile when navigating
+  useEffect(() => {
+    if (window.innerWidth < 768) setSidebarOpen(false);
+  }, [loc.pathname]);
 
   const initials = user?.full_name
     ?.split(" ")
@@ -264,10 +271,23 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
 
   return (
     <div className="flex min-h-screen bg-brand-50">
+      {/* ── Mobile backdrop ──────────────────────────────────────────── */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={() => toggleSidebar(false)}
+        />
+      )}
+
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
-      <aside className={`flex shrink-0 flex-col border-r border-brand-100 bg-white transition-all duration-200 ${sidebarOpen ? "w-56" : "w-0 overflow-hidden"}`}>
+      <aside className={`
+        fixed inset-y-0 left-0 z-40
+        md:static md:inset-auto md:z-auto
+        flex shrink-0 flex-col border-r border-brand-100 bg-white transition-all duration-300
+        ${sidebarOpen ? "w-64 translate-x-0 md:w-56" : "w-64 -translate-x-full md:translate-x-0 md:w-0 md:overflow-hidden"}
+      `}>
         {/* Logo */}
-        <div className="flex h-14 w-56 items-center gap-2.5 border-b border-brand-100 px-4">
+        <div className="flex h-14 w-full items-center gap-2.5 border-b border-brand-100 px-4">
           <img src={`${import.meta.env.BASE_URL}rigpro-logo.png`} alt="RigPro" className="h-8 w-auto" />
           <div className="flex-1">
             <p className="text-sm font-bold leading-tight text-brand-900">RigPro</p>
@@ -336,13 +356,13 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
 
       {/* ── Main ─────────────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-brand-100 bg-white px-6">
+        <header className="flex h-14 items-center justify-between border-b border-brand-100 bg-white px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {!sidebarOpen && (
               <button
                 onClick={() => toggleSidebar(true)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-brand-500 transition hover:bg-brand-50 hover:text-brand-800"
-                aria-label="Expand sidebar"
+                aria-label="Open sidebar"
               >
                 <Ico.Menu />
               </button>
@@ -351,7 +371,7 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
           </div>
           <NotificationBell user={user} />
         </header>
-        <main className="flex-1 overflow-auto px-6 py-5">{children}</main>
+        <main className="flex-1 overflow-auto px-4 py-4 sm:px-6 sm:py-5">{children}</main>
       </div>
     </div>
   );
