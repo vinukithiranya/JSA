@@ -30,7 +30,7 @@ interface ActionStats {
   overdue: number;
 }
 
-const GLASS = "bg-black/[0.30] backdrop-blur-xl border border-white/20 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.40),inset_0_1px_0_rgba(255,255,255,0.15)]";
+const GLASS = "bg-white/[0.18] backdrop-blur-2xl border border-white/60 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.85),inset_0_-1px_0_rgba(255,255,255,0.1)]";
 const BG_STYLE: React.CSSProperties = {
   backgroundImage: `url('${import.meta.env.BASE_URL}dashboard-bg.png')`,
   backgroundSize: "cover",
@@ -106,11 +106,11 @@ function BarRow({ label, value, max, color }: { label: string; value: number; ma
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
     <div className="flex items-center gap-3">
-      <span className="w-36 shrink-0 truncate text-xs text-white/75">{label}</span>
+      <span className="w-36 shrink-0 truncate text-xs text-brand-600">{label}</span>
       <div className="flex-1 overflow-hidden rounded-full bg-white/20 h-2.5">
         <div className={`h-2.5 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-8 text-right text-xs font-semibold text-white">{value}</span>
+      <span className="w-8 text-right text-xs font-semibold text-brand-800">{value}</span>
     </div>
   );
 }
@@ -121,7 +121,7 @@ function GlassBar({ label, current, total, color }: { label: string; current: nu
     <div>
       <div className="mb-1 flex justify-between text-xs">
         <span className="font-medium capitalize text-gray-700">{label}</span>
-        <span className="font-bold text-white">{current}</span>
+        <span className="font-bold text-brand-800">{current}</span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
         <div className="h-2 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: color }} />
@@ -210,7 +210,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
         </div>
 
         {/* ── Tab bar ─────────────────────────────────────────── */}
-        <div className="bg-black/30 backdrop-blur-xl border border-white/20 rounded-2xl p-1.5 flex gap-1 w-fit mb-5 shadow-[0_4px_20px_rgba(0,0,0,0.35)]">
+        <div className="bg-white/[0.18] backdrop-blur-2xl border border-white/60 rounded-2xl p-1.5 flex gap-1 w-fit mb-5 shadow-[0_4px_20px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.85)]">
           {tabs.map(t => (
             <button
               key={t.key}
@@ -218,7 +218,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
               className={`rounded-xl px-4 py-1.5 text-sm font-semibold transition-all duration-200 ${
                 tab === t.key
                   ? "bg-brand-600 text-white shadow-sm"
-                  : "text-white/90 hover:bg-white/20"
+                  : "text-brand-700 hover:bg-white/20"
               }`}
             >
               {t.label}
@@ -239,19 +239,19 @@ export default function DashboardPage({ user, onLogout }: Props) {
 
                   {/* Inspections */}
                   <div className={`${GLASS} p-5`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-3">Inspections</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-3">Inspections</p>
                     <div className="flex items-end justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-4xl font-bold text-white">{inspTotal}</p>
+                        <p className="text-4xl font-bold text-brand-800">{inspTotal}</p>
                         <div className="mt-2 flex flex-col gap-1">
-                          <span className="inline-flex items-center gap-1.5 text-xs text-white/75">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-brand-600">
                             <span className="h-2 w-2 rounded-full bg-brand-500 shrink-0" />{inspCompleted} completed
                           </span>
-                          <span className="inline-flex items-center gap-1.5 text-xs text-white/75">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-brand-600">
                             <span className="h-2 w-2 rounded-full bg-amber-400 shrink-0" />{inspInProgress} in progress
                           </span>
                           {inspAvgScore != null && (
-                            <span className="inline-flex items-center gap-1.5 text-xs text-white/75">
+                            <span className="inline-flex items-center gap-1.5 text-xs text-brand-600">
                               <span className="h-2 w-2 rounded-full bg-sky-400 shrink-0" />Avg score {inspAvgScore.toFixed(1)}%
                             </span>
                           )}
@@ -262,20 +262,20 @@ export default function DashboardPage({ user, onLogout }: Props) {
                         color="#499241"
                       />
                     </div>
-                    <Link to="/inspections" className="mt-3 block text-xs font-semibold text-white/80 hover:text-white">View all →</Link>
+                    <Link to="/inspections" className="mt-3 block text-xs font-semibold text-brand-700 hover:text-brand-900">View all →</Link>
                   </div>
 
                   {/* Issues */}
                   <div className={`${GLASS} p-5`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-3">Open Issues</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-3">Open Issues</p>
                     <div className="flex items-end justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-4xl font-bold text-white">{openIssues}</p>
+                        <p className="text-4xl font-bold text-brand-800">{openIssues}</p>
                         <div className="mt-2 flex flex-col gap-1">
-                          <span className="inline-flex items-center gap-1.5 text-xs text-white/75">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-brand-600">
                             <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" />{highPriority} high priority
                           </span>
-                          <span className="inline-flex items-center gap-1.5 text-xs text-white/75">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-brand-600">
                             <span className="h-2 w-2 rounded-full bg-gray-400 shrink-0" />{totalIssues} total
                           </span>
                         </div>
@@ -285,12 +285,12 @@ export default function DashboardPage({ user, onLogout }: Props) {
                         color="#f59e0b"
                       />
                     </div>
-                    <Link to="/issues" className="mt-3 block text-xs font-semibold text-white/80 hover:text-white">View all →</Link>
+                    <Link to="/issues" className="mt-3 block text-xs font-semibold text-brand-700 hover:text-brand-900">View all →</Link>
                   </div>
 
                   {/* Status Overview */}
                   <div className={`${GLASS} p-5`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">Status Overview</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">Status Overview</p>
                     <div className="space-y-3">
                       {[
                         { label: "Insp. Completed",  current: inspCompleted,            total: inspTotal    },
@@ -303,7 +303,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                           <div key={label}>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-medium text-gray-600 truncate">{label}</span>
-                              <span className="text-xs font-semibold text-white shrink-0 ml-2">{current}/{total}</span>
+                              <span className="text-xs font-semibold text-brand-700 shrink-0 ml-2">{current}/{total}</span>
                             </div>
                             <div className="h-2 overflow-hidden rounded-full bg-white/20">
                               <div className="h-2 rounded-full bg-brand-500 transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -313,7 +313,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                       })}
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-brand-100/70 px-2.5 py-1 text-xs font-semibold text-white">{doneActions} done</span>
+                      <span className="rounded-full bg-brand-100/70 px-2.5 py-1 text-xs font-semibold text-brand-700">{doneActions} done</span>
                       {overdueActions > 0 && (
                         <span className="rounded-full bg-red-100/70 px-2.5 py-1 text-xs font-semibold text-red-700">{overdueActions} overdue</span>
                       )}
@@ -325,9 +325,9 @@ export default function DashboardPage({ user, onLogout }: Props) {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className={`${GLASS} p-4 flex items-center justify-between gap-3`}>
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Completion Rate</p>
-                      <p className="mt-1 text-2xl font-bold text-white">{completionRate}%</p>
-                      <span className="inline-flex items-center rounded-full bg-brand-100/70 px-2 py-0.5 text-xs font-semibold text-white mt-1.5">
+                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">Completion Rate</p>
+                      <p className="mt-1 text-2xl font-bold text-brand-800">{completionRate}%</p>
+                      <span className="inline-flex items-center rounded-full bg-brand-100/70 px-2 py-0.5 text-xs font-semibold text-brand-700 mt-1.5">
                         Inspections
                       </span>
                     </div>
@@ -336,8 +336,8 @@ export default function DashboardPage({ user, onLogout }: Props) {
 
                   <div className={`${GLASS} p-4 flex items-center justify-between gap-3`}>
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Open Actions</p>
-                      <p className="mt-1 text-2xl font-bold text-white">{openActions}</p>
+                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">Open Actions</p>
+                      <p className="mt-1 text-2xl font-bold text-brand-800">{openActions}</p>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold mt-1.5 ${openActions > 5 ? "bg-blue-100/70 text-blue-700" : "bg-brand-100/70 text-brand-700"}`}>
                         of {totalActions} total
                       </span>
@@ -350,8 +350,8 @@ export default function DashboardPage({ user, onLogout }: Props) {
 
                   <div className={`${GLASS} p-4 flex items-center justify-between gap-3`}>
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Overdue Actions</p>
-                      <p className="mt-1 text-2xl font-bold text-white">{overdueActions}</p>
+                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">Overdue Actions</p>
+                      <p className="mt-1 text-2xl font-bold text-brand-800">{overdueActions}</p>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold mt-1.5 ${overdueActions > 0 ? "bg-red-100/70 text-red-700" : "bg-brand-100/70 text-brand-700"}`}>
                         {overdueActions > 0 ? "Needs attention" : "On track"}
                       </span>
@@ -366,7 +366,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                 {/* Row 3: Quick Actions + Issue Priority donut */}
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                   <div className={`${GLASS} p-5 lg:col-span-2`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">Quick Actions</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">Quick Actions</p>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {quickActions.map(({ to, label, icon, cls }) => (
                         <Link key={to} to={to} className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all backdrop-blur-sm border ${cls}`}>
@@ -377,7 +377,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                   </div>
 
                   <div className={`${GLASS} p-5`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">Issue Priority</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">Issue Priority</p>
                     <div className="flex flex-col items-center">
                       <DonutChart segments={[
                         { value: issueStats?.by_priority?.["critical"]??0, color:"#ef4444", label:"Critical" },
@@ -394,7 +394,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                         ].map(({ label, color, key }) => (
                           <div key={key} className="flex items-center gap-1.5">
                             <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                            <span className="text-xs text-white/75">{label}</span>
+                            <span className="text-xs text-brand-600">{label}</span>
                             <span className="ml-auto text-xs font-semibold text-brand-800">{issueStats?.by_priority?.[key] ?? 0}</span>
                           </div>
                         ))}
@@ -409,7 +409,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                   {/* Inspection Status */}
                   {inspStats && inspStats.total > 0 && (
                     <div className={`${GLASS} p-5`}>
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">Inspection Status</p>
+                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">Inspection Status</p>
                       <div className="space-y-3">
                         {Object.entries(inspStats.by_status).map(([status, count]) => {
                           const colors: Record<string,string> = { completed:"#499241", in_progress:"#f59e0b", approved:"#22c55e", pending_approval:"#3b82f6", draft:"#9ca3af" };
@@ -423,7 +423,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                   {actionStats && (
                     <div className={`${GLASS} p-5`}>
                       <div className="flex items-start justify-between mb-4">
-                        <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Actions Status</p>
+                        <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">Actions Status</p>
                         {overdueActions > 0 && <span className="rounded-full bg-red-100/70 px-2.5 py-1 text-xs font-semibold text-red-700">{overdueActions} overdue</span>}
                       </div>
                       <div className="space-y-3">
@@ -436,14 +436,14 @@ export default function DashboardPage({ user, onLogout }: Props) {
                           <GlassBar key={key} label={label} current={actionStats.by_status?.[key] ?? 0} total={totalActions} color={color} />
                         ))}
                       </div>
-                      <Link to="/actions" className="mt-3 block text-xs font-semibold text-white/80 hover:text-white">View all →</Link>
+                      <Link to="/actions" className="mt-3 block text-xs font-semibold text-brand-700 hover:text-brand-900">View all →</Link>
                     </div>
                   )}
 
                   {/* Issues by Type */}
                   {issueStats && issueStats.total > 0 && (
                     <div className={`${GLASS} p-5`}>
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">Issues by Type</p>
+                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">Issues by Type</p>
                       <div className="space-y-3">
                         {Object.entries(issueStats.by_type).map(([type, count]) => {
                           const mx = Math.max(...Object.values(issueStats.by_type), 1);
@@ -456,7 +456,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                   {/* Legacy JSA */}
                   {dashSummary && dashSummary.kpi.total_jsa > 0 && (
                     <div className={`${GLASS} p-5`}>
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">Legacy JSA Records</p>
+                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">Legacy JSA Records</p>
                       <div className="space-y-3">
                         {dashSummary.status_breakdown.map(item => {
                           const jsaColors: Record<string,string> = { draft:"#9fd78a", pending_approval:"#f59e0b", approved:"#22c55e" };
@@ -486,14 +486,14 @@ export default function DashboardPage({ user, onLogout }: Props) {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                       </div>
-                      <p className="text-2xl font-bold text-white">{value}</p>
+                      <p className="text-2xl font-bold text-brand-800">{value}</p>
                       <p className="text-xs font-medium text-gray-500 mt-0.5">{label}</p>
                     </div>
                   ))}
                 </div>
 
                 <div className={`${GLASS} p-5`}>
-                  <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">Top Templates by Usage</p>
+                  <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">Top Templates by Usage</p>
                   <div className="space-y-3">
                     {(inspStats.by_template ?? []).slice(0, 6).map(t => {
                       const mx = Math.max(...(inspStats.by_template??[]).map(x=>x.count), 1);
@@ -507,7 +507,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className={`${GLASS} p-5 space-y-4`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Completion & Flagged Rates</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">Completion & Flagged Rates</p>
                     {[
                       { label:"Completion Rate", value: inspStats.total>0?((inspStats.by_status?.completed??0)/inspStats.total*100):0, color:"#499241" },
                       { label:"Flagged Rate",     value: inspStats.flagged_rate??0,                                                    color:"#ef4444" },
@@ -525,7 +525,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                   </div>
 
                   <div className={`${GLASS} p-5`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">By Status</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">By Status</p>
                     <div className="space-y-3">
                       {Object.entries(inspStats.by_status ?? {}).map(([status, count]) => {
                         const mx = Math.max(...Object.values(inspStats.by_status??{}), 1);
@@ -545,8 +545,8 @@ export default function DashboardPage({ user, onLogout }: Props) {
                 <div className={`${GLASS} p-5`}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Total Issues</p>
-                      <p className="mt-1 text-3xl font-bold text-white">{issueStats.total}</p>
+                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">Total Issues</p>
+                      <p className="mt-1 text-3xl font-bold text-brand-800">{issueStats.total}</p>
                     </div>
                     <MiniBarChart data={Object.values(issueStats.by_status??{}).map(v=>v as number)} color="#499241" />
                   </div>
@@ -554,7 +554,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <div className={`${GLASS} p-5`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">By Priority</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">By Priority</p>
                     <div className="space-y-3">
                       {[
                         { key:"critical", label:"Critical", color:"bg-red-500"    },
@@ -570,7 +570,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                   </div>
 
                   <div className={`${GLASS} p-5`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">By Type</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">By Type</p>
                     <div className="space-y-3">
                       {Object.entries(issueStats.by_type ?? {}).map(([type, count]) => {
                         const mx = Math.max(...Object.values(issueStats.by_type??{}), 1);
@@ -581,7 +581,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                 </div>
 
                 <div className={`${GLASS} p-5`}>
-                  <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">Open vs Resolved</p>
+                  <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">Open vs Resolved</p>
                   {(() => {
                     const open     = issueStats.by_status?.["open"]     ?? 0;
                     const resolved = issueStats.by_status?.["resolved"] ?? 0;
@@ -630,15 +630,15 @@ export default function DashboardPage({ user, onLogout }: Props) {
                     { label:"Completed",      value: actionStats.by_status?.["complete"]??0, accent:"border-brand-300" },
                   ].map(({ label, value, accent }) => (
                     <div key={label} className={`${GLASS} p-5 border-l-4 ${accent}`}>
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">{label}</p>
-                      <p className="mt-1 text-3xl font-bold text-white">{value}</p>
+                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">{label}</p>
+                      <p className="mt-1 text-3xl font-bold text-brand-800">{value}</p>
                     </div>
                   ))}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <div className={`${GLASS} p-5`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">By Status</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">By Status</p>
                     <div className="space-y-3">
                       {[
                         { key:"to_do",       label:"To Do",       color:"bg-gray-400"   },
@@ -654,7 +654,7 @@ export default function DashboardPage({ user, onLogout }: Props) {
                   </div>
 
                   <div className={`${GLASS} p-5`}>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-wide mb-4">By Priority</p>
+                    <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">By Priority</p>
                     <div className="space-y-3">
                       {[
                         { key:"high",   label:"High",   color:"bg-red-400"   },
