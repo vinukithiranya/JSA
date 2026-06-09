@@ -8,3 +8,10 @@ frontend/dist
 backend/rigpro.db
 frontend/tsconfig.tsbuildinfo
 tmp
+
+# Claude Code local files
+.claude/settings.local.json
+.claude/worktrees/
+
+# Office temporary lock files
+~$*
