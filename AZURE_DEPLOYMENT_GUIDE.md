@@ -2,115 +2,120 @@
 
 ---
 
-## Quick Summary
+## Your Setup at a Glance
 
-| | Detail |
-|---|---|
-| **Recommended option** | Azure Container Apps + Azure PostgreSQL |
-| **Minimum monthly cost** | ~$15–20 / month (small team) |
-| **One-command local run** | `docker compose up --build` |
-| **One-command redeploy** | `az acr build ... && az containerapp update ...` |
-| **Time to deploy** | ~45 minutes first time |
+| | Today | Coming Years |
+|---|---|---|
+| **Users** | ~35 | 100+ |
+| **Inspections per day** | 1 (expected minimum) | 10+ (if system is well adopted) |
+| **PDFs generated per year** | ~365 | ~3,650+ |
+| **Database size per year** | ~200 MB | ~2 GB |
+| **Recommended Azure tier** | App Service B1 | App Service B2 → P1v3 |
 
 ---
 
-## Part 1 — How Much Does It Cost?
+## Part 1 — Cost Right Now (35 Users, 1–10 Inspections/Day)
 
-### Option A — Cheapest (Recommended for small teams)
+| Azure Service | What It Does | Size | Cost/Month |
+|---|---|---|---|
+| App Service (B1 Linux) | Runs your Docker container 24/7 | 1 vCPU, 1.75 GB RAM | ~$13 |
+| Azure Database for PostgreSQL | Your database | B1ms — 1 vCore, 2 GB RAM | ~$12 |
+| Azure Blob Storage | Stores PDFs, photos, documents | 10 GB (enough for ~2 years) | ~$0.50 |
+| Docker Hub (free account) | Stores your Docker image | Free tier | $0 |
+| **Total** | | | **~$26 / month** |
 
-Uses **Azure Container Apps** which only charges when your app is actually receiving requests.
-For an internal safety app with moderate usage, this is the lowest-cost path.
-
-| Service | Purpose | Cost/month |
-|---|---|---|
-| Azure Container Apps (Consumption) | Runs your Docker container | ~$3–8 |
-| Azure Database for PostgreSQL B1ms | Your database | ~$12 |
-| Docker Hub (free account) | Stores your Docker image | $0 |
-| Azure Blob Storage (50 GB) | PDFs, documents, uploads | ~$1 |
-| **Total** | | **~$16–21 / month** |
-
-> The Container Apps free allowance is 180,000 vCPU-seconds and 360,000 GB-seconds per month.
-> For an internal app used by a small team during business hours, most months will hit little or no charge beyond the database.
+> **No setup fee.** Azure charges by the day from the moment services are created.
+> Your first month costs the same as every month after — there is no one-time deployment charge.
 
 ---
 
-### Option B — Simple & Stable (Recommended once the team grows past ~15 people)
+## Part 2 — How Costs Change as You Grow
 
-Uses **Azure App Service B1** which runs 24/7 regardless of traffic. More predictable billing.
+### What drives cost up
 
-| Service | Purpose | Cost/month |
-|---|---|---|
-| Azure App Service B1 (Linux) | Runs your Docker container | ~$13 |
-| Azure Database for PostgreSQL B1ms | Your database | ~$12 |
-| Azure Container Registry Basic | Stores your Docker image | ~$5 |
-| Azure Files (32 GB) | PDFs, documents, uploads | ~$2 |
-| **Total** | | **~$32 / month** |
+- **More users = more simultaneous API requests** → needs more CPU and RAM on the app server
+- **More inspections = more database queries and more PDF files stored**
+- **More data stored = slightly more storage cost** (but storage is very cheap — negligible)
 
----
+The database size growth for your usage:
+- Each inspection record in PostgreSQL: ~50 KB of data
+- 10 inspections/day × 365 days = 3,650 records/year = **~180 MB/year** — tiny
+- Each inspection PDF file: ~1–2 MB
+- 10 PDFs/day × 365 days = **~3–7 GB of PDFs per year**
 
-### Option C — Ultra Cheap Single VM (Not recommended for production)
-
-Runs everything on one Azure virtual machine using your existing `docker-compose.yml`.
-Cheapest possible, but if the VM crashes, everything goes down.
-
-| Service | Purpose | Cost/month |
-|---|---|---|
-| Azure VM B2s (2 vCPU, 4 GB) | Runs Docker + PostgreSQL together | ~$35 |
-| Azure Blob Storage (50 GB) | PDFs, documents, uploads | ~$1 |
-| **Total** | | **~$36 / month** |
-
-> This is only worth it if you want complete control and are comfortable managing a Linux VM.
+Storage cost for 7 GB on Azure Blob = **~$0.13/month** — essentially free.
+The cost that grows is the **compute tier** as concurrent users increase.
 
 ---
 
-## Part 2 — How Costs Change as Your Team Grows
+### Cost Over Time — Your Specific Numbers
 
-Unlike SafetyCulture ($25/user/month), **RigPro has no per-user fee**.
-Costs only increase when traffic or data storage grows — not when you add people.
+| Phase | When | Users | Inspections/Day | App Service | PostgreSQL | Storage | **Total/Month** |
+|---|---|---|---|---|---|---|---|
+| **Now** | Today | 35 | 1–5 | B1 — $13 | B1ms — $12 | 10 GB — $0.50 | **~$26** |
+| **Near Future** | 6–18 months | 50–100 | 5–10 | B2 — $26 | B1ms — $12 | 50 GB — $1 | **~$39** |
+| **Growth** | 2–3 years | 100+ | 10–20 | P1v3 — $73 | B2ms — $25 | 100 GB — $2 | **~$100** |
+| **At Scale** | 3+ years | 200+ | 20+ | P2v3 — $146 | D2ds — $110 | 200 GB — $4 | **~$260** |
 
-| Team Size | Recommended Setup | Estimated Cost/month |
-|---|---|---|
-| **1–10 people** | Container Apps (Consumption) + PostgreSQL B1ms | ~$16–21 |
-| **10–30 people** | App Service B1 + PostgreSQL B1ms | ~$32 |
-| **30–80 people** | App Service B2 + PostgreSQL B2ms | ~$65 |
-| **80–200 people** | App Service P1v3 + PostgreSQL D2ds | ~$150 |
-| **200+ people** | App Service P2v3 (×2 instances) + PostgreSQL D4ds + CDN | ~$300 |
-
-### Comparison vs SafetyCulture
-
-| Team Size | SafetyCulture | RigPro on Azure |
-|---|---|---|
-| 10 users | $250/month | $21/month |
-| 30 users | $750/month | $32/month |
-| 80 users | $2,000/month | $65/month |
-| 200 users | $5,000/month | $150/month |
+> Upgrades are one command — no downtime, no redeploy needed.
+> You only upgrade when Azure Monitor shows CPU consistently above 70% — not before.
 
 ---
 
-## Part 3 — Before You Start
+### Compared to SafetyCulture (No Per-User Fee on RigPro)
 
-You need these installed on your machine:
+| Users | SafetyCulture ($25/user/month) | RigPro on Azure |
+|---|---|---|
+| 35 users | $875/month | **$26/month** |
+| 100 users | $2,500/month | **$39/month** |
+| 200 users | $5,000/month | **$100/month** |
+
+RigPro has **no per-user fee**. Adding 65 more users costs you $0 extra until traffic forces a compute upgrade.
+
+---
+
+## Part 3 — When to Upgrade (Simple Rule)
+
+You do not need to upgrade proactively. Upgrade only when you see these signs:
+
+| Sign | What to Upgrade | Cost Increase |
+|---|---|---|
+| App feels slow during work hours / requests timing out | App Service: B1 → B2 | +$13/month |
+| Database queries taking >2 seconds | PostgreSQL: B1ms → B2ms | +$12/month |
+| PDF storage folder getting large (check monthly) | Blob Storage tier | +$1–2/month |
+| 100+ users all active at the same time | App Service: B2 → P1v3 | +$47/month |
+
+Check CPU usage in Azure Portal → App Service → Metrics → CPU Percentage.
+If it stays above 70% during business hours for more than a week, upgrade.
+
+---
+
+## Part 4 — Before You Start
+
+Install these on your Windows machine:
 
 1. **Azure CLI** — download from `https://aka.ms/installazurecliwindows`
 2. **Docker Desktop** — download from `https://www.docker.com/products/docker-desktop`
-3. **Azure account** — create free at `https://portal.azure.com` ($200 free credit for 30 days)
-4. **Docker Hub account** — create free at `https://hub.docker.com`
+3. **Azure account** — sign up free at `https://portal.azure.com` (comes with $200 credit for 30 days)
+4. **Docker Hub account** — sign up free at `https://hub.docker.com`
 
-Check everything is installed — open PowerShell and run:
+Verify they are installed — open PowerShell and run:
 
 ```powershell
 az --version
 docker --version
 ```
 
-Both should print version numbers. If not, install them first.
+Both should print version numbers without errors.
 
 ---
 
-## Part 4 — Full Deployment Steps (Option A — Recommended)
+## Part 5 — Full Deployment Steps
 
-> Run all commands in PowerShell from your project folder:
-> `cd c:\Users\vinukiT\Downloads\JAS`
+> Open PowerShell and navigate to your project folder first:
+> ```powershell
+> cd "c:\Users\vinukiT\Downloads\JAS"
+> ```
 
 ---
 
@@ -120,48 +125,49 @@ Both should print version numbers. If not, install them first.
 az login
 ```
 
-A browser window opens. Sign in with your Azure account. Come back to the terminal when done.
+A browser window opens. Sign in with your Azure account. Return to PowerShell when done.
 
 ---
 
 ### Step 2 — Create a Resource Group
 
-A resource group is a folder that holds all your Azure services together.
+A resource group is like a folder that holds all your Azure services together. Deleting the folder deletes everything inside it.
 
 ```powershell
 az group create --name rigpro-rg --location australiaeast
 ```
 
 > Change `australiaeast` to the region closest to your team.
-> Other options: `eastus`, `westeurope`, `southeastasia`, `uksouth`
+> Options: `eastus`, `westeurope`, `southeastasia`, `uksouth`, `australiaeast`
 
 ---
 
-### Step 3 — Push Your Docker Image to Docker Hub
+### Step 3 — Build and Push Your Docker Image
 
-Docker Hub stores your image so Azure can pull it.
+Docker Hub stores your image so Azure can pull it when it starts.
 
 ```powershell
-# Login to Docker Hub (enter your Docker Hub username and password when prompted)
+# Login to Docker Hub (enter your username and password when prompted)
 docker login
 
-# Build the image (this builds both React frontend + FastAPI backend into one image)
-# Replace "yourdockerhubusername" with your actual Docker Hub username
+# Build the Docker image
+# IMPORTANT: Replace "yourdockerhubusername" with your actual Docker Hub username
 docker build -t yourdockerhubusername/rigpro:latest .
 
 # Push to Docker Hub
 docker push yourdockerhubusername/rigpro:latest
 ```
 
-> The build takes 3–5 minutes the first time. It builds the React frontend and bundles it with the Python backend into one container.
+> The build takes 3–5 minutes the first time. It compiles the React frontend and bundles it together with the FastAPI backend into one container image.
 
 ---
 
 ### Step 4 — Create the PostgreSQL Database
 
 ```powershell
-# Create the PostgreSQL server
-# IMPORTANT: Change "MySecurePassword123!" to your own strong password
+# Create the database server
+# IMPORTANT: Replace "MySecurePassword123!" with your own strong password
+# Write this password down — you will need it in Step 7
 az postgres flexible-server create `
   --resource-group rigpro-rg `
   --name rigpro-db-server `
@@ -175,7 +181,7 @@ az postgres flexible-server create `
   --yes
 ```
 
-> This takes 3–5 minutes. Wait for it to finish before moving on.
+> This takes 3–5 minutes. Do not close PowerShell. Wait for the command to finish.
 
 ```powershell
 # Create the database inside the server
@@ -184,7 +190,7 @@ az postgres flexible-server db create `
   --server-name rigpro-db-server `
   --database-name rigpro_jsa
 
-# Allow Azure services to connect to the database
+# Allow the App Service to connect to the database
 az postgres flexible-server firewall-rule create `
   --resource-group rigpro-rg `
   --name rigpro-db-server `
@@ -195,169 +201,191 @@ az postgres flexible-server firewall-rule create `
 
 ---
 
-### Step 5 — Create Blob Storage for PDFs and Uploads
+### Step 5 — Create Storage for PDFs and Uploads
 
-Without this, every time your container restarts, all uploaded PDFs and documents are lost.
+Without this step, every time your container restarts all PDFs and uploaded documents are permanently deleted.
 
 ```powershell
-# Create a storage account (name must be lowercase, no hyphens, globally unique)
+# Create the storage account
+# Name must be lowercase letters and numbers only, globally unique, max 24 characters
 az storage account create `
   --name rigprostorage `
   --resource-group rigpro-rg `
   --location australiaeast `
   --sku Standard_LRS
 
-# Create a container inside the storage account
-az storage container create `
-  --name rigpro-files `
+# Get the storage account key — copy and save this value
+az storage account keys list `
+  --resource-group rigpro-rg `
   --account-name rigprostorage `
-  --public-access off
+  --query "[0].value" `
+  --output tsv
+
+# Create a file share inside the storage account
+az storage share create `
+  --name rigpro-files `
+  --account-name rigprostorage
 ```
 
 ---
 
-### Step 6 — Create the Container App Environment
+### Step 6 — Create the App Service Plan
 
-Container Apps need an "environment" to run inside — think of it as the hosting space.
+The App Service Plan is the server your app runs on. B1 handles 35 users and daily inspections comfortably.
 
 ```powershell
-# Install the Container Apps extension for Azure CLI (first time only)
-az extension add --name containerapp --upgrade
-
-# Create the environment
-az containerapp env create `
-  --name rigpro-env `
+az appservice plan create `
+  --name rigpro-plan `
   --resource-group rigpro-rg `
-  --location australiaeast
+  --is-linux `
+  --sku B1
 ```
 
 ---
 
 ### Step 7 — Deploy the App
 
-Now deploy your Docker image as a Container App.
-
-Replace the following before running:
-- `yourdockerhubusername` → your Docker Hub username
-- `MySecurePassword123!` → the password you set in Step 4
-
 ```powershell
-az containerapp create `
-  --name rigpro-app `
-  --resource-group rigpro-rg `
-  --environment rigpro-env `
-  --image yourdockerhubusername/rigpro:latest `
-  --target-port 8000 `
-  --ingress external `
-  --min-replicas 0 `
-  --max-replicas 3 `
-  --cpu 0.5 `
-  --memory 1.0Gi `
-  --env-vars DATABASE_URL="postgresql+psycopg2://rigpro:MySecurePassword123!@rigpro-db-server.postgres.database.azure.com:5432/rigpro_jsa?sslmode=require"
-```
-
-> `--min-replicas 0` means the app scales to zero when not in use — this is what keeps costs low.
-
----
-
-### Step 8 — Get Your Live URL
-
-```powershell
-az containerapp show `
-  --name rigpro-app `
-  --resource-group rigpro-rg `
-  --query properties.configuration.ingress.fqdn `
-  --output tsv
-```
-
-This prints your live URL — something like:
-```
-rigpro-app.nicename-abc123.australiaeast.azurecontainerapps.io
-```
-
-Open that URL in your browser. Your app is live.
-
----
-
-### Step 9 — Verify It Works
-
-Open the URL in your browser and log in with these default accounts (seeded automatically):
-
-| Email | Password | Role |
-|---|---|---|
-| admin@rigpro.com | admin123 | Admin |
-| supervisor@rigpro.com | super123 | Supervisor |
-| tech@rigpro.com | tech123 | Technician |
-
-Also check the API docs are working:
-```
-https://your-url/docs
-```
-
-Also check the health endpoint:
-```
-https://your-url/health
-```
-
-Should return: `{"status": "ok"}`
-
----
-
-### Step 10 — Change the Default Passwords
-
-The seed passwords (`admin123`, `tech123`, `super123`) are public — change them immediately.
-
-Go to `https://your-url/docs`, find the `PUT /api/auth/change-password` endpoint, and update each account's password.
-
----
-
-## Part 5 — Deploying Updates (After First Deploy)
-
-Every time you change code and want to push an update:
-
-```powershell
-# 1. Rebuild and push the new image
-docker build -t yourdockerhubusername/rigpro:latest .
-docker push yourdockerhubusername/rigpro:latest
-
-# 2. Tell Azure to pull the new image
-az containerapp update `
-  --name rigpro-app `
-  --resource-group rigpro-rg `
-  --image yourdockerhubusername/rigpro:latest
-```
-
----
-
-## Part 6 — Upgrading When Your Team Grows
-
-When your team reaches 15–30 people and the app needs to always be running (no cold starts), switch from Container Apps to App Service:
-
-```powershell
-# Create App Service Plan (B1 = always-on, ~$13/month)
-az appservice plan create `
-  --name rigpro-plan `
-  --resource-group rigpro-rg `
-  --is-linux `
-  --sku B1
-
-# Create Web App from your Docker image
+# Create the Web App from your Docker image
+# Replace "yourdockerhubusername" with your Docker Hub username
 az webapp create `
   --resource-group rigpro-rg `
   --plan rigpro-plan `
-  --name rigpro-webapp `
+  --name rigpro-app `
   --deployment-container-image-name yourdockerhubusername/rigpro:latest
+```
 
-# Set the database connection
+> The `--name rigpro-app` becomes your URL: `https://rigpro-app.azurewebsites.net`
+> If that name is taken, change it to something unique like `rigpro-northsails`.
+
+Set the database connection — replace `MySecurePassword123!` with your password from Step 4:
+
+```powershell
 az webapp config appsettings set `
   --resource-group rigpro-rg `
-  --name rigpro-webapp `
+  --name rigpro-app `
   --settings DATABASE_URL="postgresql+psycopg2://rigpro:MySecurePassword123!@rigpro-db-server.postgres.database.azure.com:5432/rigpro_jsa?sslmode=require"
 ```
 
-When the database becomes a bottleneck (slow queries, large data), upgrade the PostgreSQL tier:
+---
+
+### Step 8 — Mount Persistent Storage for PDFs
+
+Replace `<YOUR_STORAGE_KEY>` with the key you copied in Step 5:
 
 ```powershell
+az webapp config storage-account add `
+  --resource-group rigpro-rg `
+  --name rigpro-app `
+  --custom-id rigpro-storage `
+  --storage-type AzureFiles `
+  --share-name rigpro-files `
+  --account-name rigprostorage `
+  --access-key <YOUR_STORAGE_KEY> `
+  --mount-path /app/storage
+```
+
+---
+
+### Step 9 — Start the App and Get Your URL
+
+```powershell
+# Restart to apply all settings
+az webapp restart --resource-group rigpro-rg --name rigpro-app
+
+# View the live URL
+az webapp show `
+  --resource-group rigpro-rg `
+  --name rigpro-app `
+  --query defaultHostName `
+  --output tsv
+```
+
+Your app is live at the URL printed — something like:
+```
+https://rigpro-app.azurewebsites.net
+```
+
+---
+
+### Step 10 — Verify Everything Works
+
+Open the URL in your browser and test:
+
+| Test | What to Check |
+|---|---|
+| Home page loads | No blank screen or error |
+| Login works | Use `admin@rigpro.com` / `admin123` |
+| API docs accessible | Go to `https://your-url/docs` |
+| Health check | Go to `https://your-url/health` — should show `{"status":"ok"}` |
+
+**Immediately after login — change all default passwords:**
+
+The seed passwords (`admin123`, `tech123`, `super123`) are public knowledge.
+Go to the user settings in the app and update all 3 accounts before inviting your team.
+
+---
+
+### Step 11 — Watch the Startup Logs (if something goes wrong)
+
+```powershell
+az webapp log tail --resource-group rigpro-rg --name rigpro-app
+```
+
+Look for `Application startup complete` — that confirms the app started correctly.
+The most common error is a wrong DATABASE_URL — double-check the password has no special characters like `@` or `#`.
+
+---
+
+## Part 6 — Deploying Code Updates
+
+Every time you change code and want to push the update to Azure:
+
+```powershell
+# Step 1 — Rebuild the Docker image with your changes
+docker build -t yourdockerhubusername/rigpro:latest .
+
+# Step 2 — Push to Docker Hub
+docker push yourdockerhubusername/rigpro:latest
+
+# Step 3 — Tell Azure to pull the new image (causes ~10 second restart)
+az webapp restart --resource-group rigpro-rg --name rigpro-app
+```
+
+> Your data is never affected by updates. Only the app code changes. The database and uploaded files remain untouched.
+
+---
+
+## Part 7 — How to Upgrade When You Need More Power
+
+### Upgrade App Service (when app is slow during peak hours)
+
+```powershell
+# B1 → B2 (~35 to ~100 users)
+az appservice plan update `
+  --name rigpro-plan `
+  --resource-group rigpro-rg `
+  --sku B2
+
+# B2 → P1v3 (~100 to ~200 users)
+az appservice plan update `
+  --name rigpro-plan `
+  --resource-group rigpro-rg `
+  --sku P1V3
+```
+
+No redeployment needed. The app keeps running — Azure migrates it automatically with a brief restart.
+
+### Upgrade PostgreSQL (when database queries become slow)
+
+```powershell
+# B1ms → B2ms (handles more concurrent connections)
+az postgres flexible-server update `
+  --resource-group rigpro-rg `
+  --name rigpro-db-server `
+  --sku-name Standard_B2ms
+
+# B2ms → D2ds_v4 (General Purpose — for heavy analytics queries)
 az postgres flexible-server update `
   --resource-group rigpro-rg `
   --name rigpro-db-server `
@@ -365,112 +393,102 @@ az postgres flexible-server update `
   --tier GeneralPurpose
 ```
 
+> PostgreSQL upgrades cause 30–60 seconds of downtime. Run during off-peak hours (e.g., midnight).
+
 ---
 
-## Part 7 — Monitor Costs
+## Part 8 — Set a Budget Alert (So You Are Never Surprised)
 
-Check your live spend at any time:
-
-```powershell
-az consumption usage list `
-  --billing-period-name $(az billing period list --query "[0].name" -o tsv) `
-  --query "[?contains(instanceName,'rigpro')].[instanceName,pretaxCost,currency]" `
-  --output table
-```
-
-Or go to **portal.azure.com → Cost Management + Billing → Cost Analysis** and filter by resource group `rigpro-rg`.
-
-Set a **budget alert** so you get an email if spend goes above a threshold:
+This sends you an email if your Azure bill goes above $40 in any month:
 
 ```powershell
 az consumption budget create `
   --resource-group rigpro-rg `
   --budget-name rigpro-budget `
-  --amount 50 `
+  --amount 40 `
   --time-grain Monthly `
-  --start-date 2026-06-01 `
-  --end-date 2027-06-01 `
+  --start-date 2026-07-01 `
+  --end-date 2029-07-01 `
   --category Cost
 ```
 
+Change `--amount 40` to whatever limit you want. You will receive an email warning before the limit is reached.
+
 ---
 
-## Part 8 — Shut Everything Down (Stop All Billing)
+## Part 9 — Shut Everything Down (Stop All Billing)
 
-One command deletes everything in the resource group and stops all charges:
+If you ever want to stop the app and all Azure charges:
 
 ```powershell
 az group delete --name rigpro-rg --yes --no-wait
 ```
 
-> `--no-wait` means it runs in the background. Takes ~5 minutes to fully delete.
+This deletes every service inside `rigpro-rg` and stops billing completely.
+Takes ~5 minutes to fully remove. Docker Hub image is not deleted.
 
 ---
 
-## Part 9 — Architecture Diagram
+## Part 10 — Architecture Overview
 
 ```
-Internet
-    │
-    ▼
-Azure Container Apps  (rigpro-app)
-    │  Docker image: yourdockerhubusername/rigpro:latest
-    │  FastAPI backend + React frontend (bundled)
-    │  Port 8000
-    │
-    ├──► Azure Database for PostgreSQL  (rigpro-db-server)
-    │       Database: rigpro_jsa
-    │       Tables: users, jsa_records, inspection_records,
-    │               issues, actions, templates, ...
-    │
-    └──► Azure Blob Storage  (rigprostorage)
-             Container: rigpro-files
-             Stores: PDF reports, uploaded documents, photos
+Your Team (35 → 100+ users)
+         │
+         ▼  HTTPS
+Azure App Service  ──── rigpro-app.azurewebsites.net
+(App Service B1)
+  └─ Docker container:  yourdockerhubusername/rigpro:latest
+     ├─ React frontend  (served as static files on /)
+     └─ FastAPI backend (API on /api/...)
+         │                        │
+         ▼                        ▼
+Azure PostgreSQL B1ms       Azure Files Share
+(rigpro-db-server)          (rigpro-files)
+  └─ Database: rigpro_jsa     └─ /app/storage
+     All tables, records,         PDFs, photos,
+     users, inspections           documents
+     issues, actions...
 
 Docker Hub (free)
-    └──► Stores the Docker image that Azure pulls from
+  └─ Stores image between deploys
 ```
 
 ---
 
-## Part 10 — Troubleshooting
+## Part 11 — Cost Summary for Your Numbers
 
-**App won't start — shows "Application Error"**
-```powershell
-# View the startup logs
-az containerapp logs show --name rigpro-app --resource-group rigpro-rg --follow
-```
-Look for the error message. Most common cause: wrong DATABASE_URL.
+| | **Today** | **If 10 inspections/day** | **At 100+ users** |
+|---|---|---|---|
+| Users | 35 | 35–50 | 100+ |
+| Inspections/day | 1 | 10 | 10–20 |
+| PDFs stored per year | ~365 | ~3,650 | ~7,000+ |
+| App Service | B1 — $13 | B1 — $13 | B2 — $26 |
+| PostgreSQL | B1ms — $12 | B1ms — $12 | B1ms — $12 |
+| Storage | $0.50 | $1 | $2 |
+| **Total/month** | **~$26** | **~$26** | **~$40** |
 
-**Database connection refused**
-- Check the firewall rule was created in Step 4
-- Check the DATABASE_URL contains `?sslmode=require` at the end
-- Check the password has no special characters that need URL encoding (avoid `@`, `#`, `%`)
-
-**App is slow on first load (cold start)**
-- This is normal for Container Apps with `--min-replicas 0`
-- First request after inactivity takes 10–15 seconds to start the container
-- Fix: set `--min-replicas 1` (keeps one instance always running, adds ~$3–5/month)
-
-**PDF downloads not working after restart**
-- Storage volume is not mounted — check Step 5 was completed
-- PDFs stored inside the container are lost on restart
+> Going from 1 to 10 inspections per day does **not** increase cost at all.
+> The database and storage cost of 10× more inspections is less than $1/month extra.
+> Cost only goes up meaningfully when you add more concurrent users hitting the app at the same time.
 
 ---
 
-## Summary Checklist
+## Deployment Checklist
 
-- [ ] Azure CLI installed and `az login` done
-- [ ] Docker Desktop installed
-- [ ] Docker Hub account created
+- [ ] Azure CLI installed — `az --version` works
+- [ ] Docker Desktop installed — `docker --version` works
+- [ ] Azure account created and `az login` done
+- [ ] Docker Hub account created and `docker login` done
 - [ ] Resource group created (`rigpro-rg`)
 - [ ] Docker image built and pushed to Docker Hub
-- [ ] PostgreSQL server and database created
+- [ ] PostgreSQL server created and database `rigpro_jsa` created
 - [ ] Firewall rule added for Azure services
-- [ ] Blob storage created
-- [ ] Container App environment created
-- [ ] Container App deployed with DATABASE_URL set
-- [ ] Live URL retrieved and app opens in browser
-- [ ] Login tested with all 3 default accounts
-- [ ] Default passwords changed
-- [ ] Budget alert set
+- [ ] Storage account and file share created
+- [ ] App Service Plan B1 created
+- [ ] Web App deployed with Docker image
+- [ ] DATABASE_URL environment variable set
+- [ ] Persistent storage mounted to `/app/storage`
+- [ ] App restarted and URL retrieved
+- [ ] Login tested with admin account
+- [ ] Default passwords changed on all 3 accounts
+- [ ] Budget alert set at $40/month
