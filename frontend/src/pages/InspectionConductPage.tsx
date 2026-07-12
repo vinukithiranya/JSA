@@ -333,9 +333,7 @@ function MediaAnswerInput({ value, onChange }: { value: string[]; onChange: (v: 
       fd.append("folder", "media");
       fd.append("description", "Uploaded from inspection");
 
-      const res = await fetch("/api/documents/upload", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("upload failed");
-      const data = await res.json();
+      const data = await api<{ file_path: string }>("/api/documents/upload", { method: "POST", body: fd });
       const url = `/${data.file_path.replace(/\\/g, "/")}`;
       onChange([...value, url]);
     } catch (err) {
