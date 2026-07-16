@@ -21,6 +21,9 @@ jobs:
     defaults:
       run:
         working-directory: frontend
+    env:
+      VITE_BASE_URL: /JSA/
+      VITE_API_URL: https://jsa-production-211d.up.railway.app
     steps:
       - name: Checkout
         uses: actions/checkout@v4

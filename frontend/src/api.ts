@@ -1,4 +1,6 @@
-export const API_BASE = import.meta.env.VITE_API_URL ?? "";
+const isRailwayHost = typeof window !== "undefined" && window.location.hostname.endsWith("up.railway.app");
+
+export const API_BASE = isRailwayHost ? "" : (import.meta.env.VITE_API_URL ?? "");
 
 export function apiUrl(path: string): string {
   return `${API_BASE}${path}`;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../components/Layout";
-import { api } from "../api";
+import { api, apiUrl } from "../api";
 import type { User } from "../types";
 
 type InspectionRecord = {
@@ -68,7 +68,7 @@ export default function InspectionReportPage({ user, onLogout }: Props) {
   };
 
   const handlePrint = () => {
-    window.open(`${import.meta.env.VITE_API_URL ?? ""}/api/inspections/${id}/report`, "_blank");
+    window.open(apiUrl(`/api/inspections/${id}/report`), "_blank");
   };
 
   const fmt = (d: string) =>
