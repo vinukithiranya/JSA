@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import type { User } from "../types";
+import SignaturePad from "../components/SignaturePad";
 import {
   getLocalInspection, saveLocalInspection,
   getCachedTemplate, type LocalInspection,
@@ -515,17 +516,49 @@ function AnnotationInput() {
   );
 }
 
-/** Renders a name text input and an add-signature button for capturing a signature answer. */
-function SignatureAnswerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+/** Renders a modal wrapping the shared signature-drawing pad. */
+function SignatureModal({ onSave, onClose }: { onSave: (v: string) => void; onClose: () => void }) {
   return (
-    <div className="flex gap-2">
-      <input type="text" value={value} onChange={e => onChange(e.target.value)}
-        placeholder="Name"
-        className="flex-1 rounded-l-lg border border-brand-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-      <button className="flex shrink-0 items-center gap-2 rounded-r-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-        Add signature
-      </button>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-display text-base font-semibold text-brand-900">Add signature</h3>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <SignaturePad onSave={onSave} height={220} />
+      </div>
+    </div>
+  );
+}
+
+/** Renders a signature answer input: a drawing pad captured as a PNG data URL, with a preview and re-sign option. */
+function SignatureAnswerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [signing, setSigning] = useState(false);
+
+  return (
+    <div>
+      {value ? (
+        <div className="flex items-center gap-3 rounded-lg border border-brand-200 bg-white p-2">
+          <img src={value} alt="Signature" className="h-16 rounded border border-gray-100 bg-white object-contain" />
+          <button onClick={() => setSigning(true)}
+            className="ml-auto shrink-0 rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50">
+            Re-sign
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => setSigning(true)}
+          className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+          Add signature
+        </button>
+      )}
+      {signing && (
+        <SignatureModal
+          onSave={dataUrl => { onChange(dataUrl); setSigning(false); }}
+          onClose={() => setSigning(false)} />
+      )}
     </div>
   );
 }

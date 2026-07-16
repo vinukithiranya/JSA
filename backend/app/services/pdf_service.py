@@ -68,6 +68,67 @@ def _fmt_answer(val: object) -> str:
     return str(val)
 
 
+# ── Logic evaluation (Python port of the frontend's evalRule/activeTriggers,
+#    InspectionConductPage.tsx, so nested follow-up questions only appear in
+#    the report when their trigger condition was actually satisfied) ──────────
+
+def _eval_rule(rule: dict, value: object) -> bool:
+    """Evaluate a single logic rule against an answer value and return whether its condition is met."""
+    def _num(s: object) -> float | None:
+        try:
+            return float(s)
+        except (TypeError, ValueError):
+            return None
+
+    op = rule.get("op")
+    v = "" if value is None else str(value)
+    num = _num(v)
+    rule_value = rule.get("value", "")
+
+    if op == "is":
+        return v == rule_value
+    if op == "is_not":
+        return v != rule_value
+    if op == "is_selected":
+        return v != "" and value is not None
+    if op == "is_not_selected":
+        return v == "" or value is None
+    if op == "is_one_of":
+        return v in [s.strip() for s in str(rule_value).split(",")]
+    if op == "is_not_one_of":
+        return v not in [s.strip() for s in str(rule_value).split(",")]
+    if op in ("lt", "lte", "eq", "neq", "gte", "gt"):
+        rv = _num(rule_value)
+        if num is None or rv is None:
+            return False
+        return {
+            "lt": num < rv, "lte": num <= rv, "eq": num == rv,
+            "neq": num != rv, "gte": num >= rv, "gt": num > rv,
+        }[op]
+    if op == "between":
+        rv1 = _num(rule_value)
+        rv2 = _num(rule.get("value2", rule_value))
+        return num is not None and rv1 is not None and rv2 is not None and rv1 <= num <= rv2
+    if op == "checked":
+        return value is True or v in ("true", "checked")
+    if op == "not_checked":
+        return not (value is True or v in ("true", "checked"))
+    if op == "exists":
+        return v != "" and value is not None
+    if op == "not_exists":
+        return v == "" or value is None
+    return False
+
+
+def _active_triggers(question: dict, value: object) -> set[str]:
+    """Return the set of logic triggers whose rules are satisfied by the given answer value."""
+    active: set[str] = set()
+    for rule in question.get("logic_rules") or []:
+        if _eval_rule(rule, value):
+            active.add(rule.get("trigger"))
+    return active
+
+
 def generate_inspection_pdf(inspection: InspectionOut, template_schema: dict) -> bytes:
     """Generate and return a PDF document for an inspection report using its template schema."""
     buffer = BytesIO()
@@ -209,40 +270,51 @@ def generate_inspection_pdf(inspection: InspectionOut, template_schema: dict) ->
             Paragraph("<b>Note</b>", cell_style),
         ]]
 
-        for q in questions:
-            qid   = q.get("id", "")
-            qtext = q.get("text", "")
-            qtype = q.get("type", "")
+        def _append_questions(qlist: list, indent: int = 0) -> None:
+            """Append answer rows for questions, recursing into nested (branching) follow-up
+            questions only when their parent's stored answer actually triggered them."""
+            prefix = "↳ " * indent
+            for q in qlist:
+                qid   = q.get("id", "")
+                qtext = q.get("text", "")
+                qtype = q.get("type", "")
 
-            ans_obj = answers.get(qid, {})
-            if isinstance(ans_obj, dict):
-                val        = ans_obj.get("value")
-                note       = ans_obj.get("note") or ""
-                is_flagged = ans_obj.get("is_flagged", False)
-                media_urls = ans_obj.get("media_urls") or []
-            else:
-                val = ans_obj; note = ""; is_flagged = False; media_urls = []
+                ans_obj = answers.get(qid, {})
+                if isinstance(ans_obj, dict):
+                    val        = ans_obj.get("value")
+                    note       = ans_obj.get("note") or ""
+                    is_flagged = ans_obj.get("is_flagged", False)
+                    media_urls = ans_obj.get("media_urls") or []
+                else:
+                    val = ans_obj; note = ""; is_flagged = False; media_urls = []
 
-            val_str = _fmt_answer(val)
+                if qtype != "instruction":
+                    q_style = flag_style if is_flagged else cell_style
+                    flag_prefix = "⚑ " if is_flagged else ""
 
-            # Skip media/signature/instruction rows but add a note row for media
-            if qtype in ("instruction",):
-                continue
+                    if qtype == "signature":
+                        img = _sig_image(val) if val else None
+                        answer_cell = img if img else Paragraph("(no signature)", cell_style)
+                    else:
+                        answer_cell = Paragraph(_fmt_answer(val), cell_style)
 
-            q_style = flag_style if is_flagged else cell_style
-            flag_prefix = "⚑ " if is_flagged else ""
+                    q_rows.append([
+                        Paragraph(f"{prefix}{flag_prefix}{qtext}", q_style),
+                        answer_cell,
+                        Paragraph(note, note_style),
+                    ])
 
-            q_rows.append([
-                Paragraph(f"{flag_prefix}{qtext}", q_style),
-                Paragraph(val_str, cell_style),
-                Paragraph(note, note_style),
-            ])
+                    # Embed media images inline (one per row underneath)
+                    for media_url in media_urls[:2]:
+                        img = _image_from_url(media_url, max_width=2.5 * inch, max_height=1.8 * inch)
+                        if img:
+                            q_rows.append([Paragraph("", cell_style), img, Paragraph("", cell_style)])
 
-            # Embed media images inline (one per row underneath)
-            for media_url in media_urls[:2]:
-                img = _image_from_url(media_url, max_width=2.5 * inch, max_height=1.8 * inch)
-                if img:
-                    q_rows.append([Paragraph("", cell_style), img, Paragraph("", cell_style)])
+                nested = q.get("nested_questions") or []
+                if nested and "ask_questions" in _active_triggers(q, val):
+                    _append_questions(nested, indent + 1)
+
+        _append_questions(questions)
 
         if len(q_rows) > 1:
             q_table = Table(q_rows, colWidths=[2.8 * inch, 2.0 * inch, 1.65 * inch])

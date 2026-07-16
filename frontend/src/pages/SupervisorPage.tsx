@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
+import SignaturePad from "../components/SignaturePad";
 import { api } from "../api";
 import type { InspectionRecord, User } from "../types";
 
@@ -11,11 +12,9 @@ export default function SupervisorPage({ user, onLogout }: Props) {
   const navigate                        = useNavigate();
   const [items, setItems]               = useState<InspectionRecord[]>([]);
   const [signingItem, setSigningItem]   = useState<InspectionRecord | null>(null);
+  const [signature, setSignature]       = useState<string | null>(null);
   const [approved, setApproved]         = useState<{ id: string; label: string } | null>(null);
-  const [isEmpty, setIsEmpty]           = useState(true);
   const [approving, setApproving]       = useState(false);
-  const canvasRef                       = useRef<HTMLCanvasElement>(null);
-  const drawing                         = useRef(false);
 
   /** Fetches pending inspection records from the API and updates the items list. */
   async function load() {
@@ -27,82 +26,19 @@ export default function SupervisorPage({ user, onLogout }: Props) {
 
   useEffect(() => { load().catch(() => null); }, []);
 
-  /* ── canvas helpers ─────────────────────────────────────────────────────── */
-
-  /** Clears the signature canvas and resets it to a white background. */
-  function initCanvas() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    setIsEmpty(true);
-  }
-
-  /** Opens the signature modal for the given inspection and initialises the canvas. */
+  /** Opens the signature modal for the given inspection. */
   function openSignModal(item: InspectionRecord) {
     setSigningItem(item);
-    setIsEmpty(true);
-    setTimeout(initCanvas, 60);
+    setSignature(null);
   }
-
-  /** Returns the canvas coordinates of a mouse or touch event, scaled to the canvas dimensions. */
-  function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
-    const rect   = canvas.getBoundingClientRect();
-    const scaleX = canvas.width  / rect.width;
-    const scaleY = canvas.height / rect.height;
-    if ("touches" in e) {
-      const t = e.touches[0];
-      return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
-    }
-    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
-  }
-
-  /** Begins a new drawing path on the canvas at the pointer position. */
-  function startDraw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
-    e.preventDefault();
-    drawing.current = true;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const { x, y } = getPos(e, canvas);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  }
-
-  /** Draws a stroke on the canvas as the pointer moves, marking the signature as non-empty. */
-  function draw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
-    e.preventDefault();
-    if (!drawing.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const { x, y } = getPos(e, canvas);
-    ctx.lineWidth   = 3;
-    ctx.lineCap     = "round";
-    ctx.lineJoin    = "round";
-    ctx.strokeStyle = "#1e3a5f";
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    setIsEmpty(false);
-  }
-
-  /** Stops the active drawing stroke on the canvas. */
-  function stopDraw() { drawing.current = false; }
 
   /* ── approve ────────────────────────────────────────────────────────────── */
 
   /** Submits the supervisor signature and approves the currently selected inspection record. */
   async function confirmApprove() {
-    if (!signingItem || isEmpty) return;
+    if (!signingItem || !signature) return;
     setApproving(true);
     try {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const signature = canvas.toDataURL("image/png");
       const supervisorName = user?.full_name ?? "Supervisor";
 
       await api(`/api/inspections/${signingItem.id}/approve`, {
@@ -263,40 +199,19 @@ export default function SupervisorPage({ user, onLogout }: Props) {
 
             {/* Signature pad */}
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-bold text-brand-800">Draw your signature below</p>
-                <button
-                  onClick={initCanvas}
-                  className="rounded-lg border border-brand-200 px-3 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50"
-                >
-                  Clear
-                </button>
-              </div>
-              <div
-                className="relative overflow-hidden rounded-2xl border-2 border-brand-300 bg-white shadow-inner"
-                style={{ minHeight: 200 }}
-              >
-                <canvas
-                  ref={canvasRef}
-                  width={900}
-                  height={240}
-                  className="w-full touch-none cursor-crosshair"
-                  style={{ display: "block" }}
-                  onMouseDown={startDraw}
-                  onMouseMove={draw}
-                  onMouseUp={stopDraw}
-                  onMouseLeave={stopDraw}
-                  onTouchStart={startDraw}
-                  onTouchMove={draw}
-                  onTouchEnd={stopDraw}
-                />
-                {isEmpty && (
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
-                    <span className="text-4xl opacity-20">✍</span>
-                    <p className="text-sm font-medium text-brand-300">Sign here using your finger or stylus</p>
-                  </div>
-                )}
-              </div>
+              {signature ? (
+                <div className="flex items-center gap-3 rounded-2xl border-2 border-brand-300 bg-white p-3 shadow-inner">
+                  <img src={signature} alt="Signature preview" className="h-24 flex-1 object-contain" />
+                  <button
+                    onClick={() => setSignature(null)}
+                    className="shrink-0 rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-semibold text-brand-600 hover:bg-brand-50"
+                  >
+                    Redo
+                  </button>
+                </div>
+              ) : (
+                <SignaturePad onSave={setSignature} height={240} />
+              )}
               <p className="mt-2 text-center text-xs text-brand-400">
                 Your signature will be embedded in the record
               </p>
@@ -312,14 +227,14 @@ export default function SupervisorPage({ user, onLogout }: Props) {
           <div className="border-t border-brand-100 bg-white px-5 py-4 shadow-lg">
             <button
               onClick={confirmApprove}
-              disabled={isEmpty || approving}
+              disabled={!signature || approving}
               className="w-full rounded-xl py-4 text-base font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: isEmpty || approving ? undefined : "#377133" }}
+              style={{ background: !signature || approving ? undefined : "#377133" }}
             >
               {approving
                 ? "Saving approval…"
-                : isEmpty
-                  ? "Draw your signature to continue"
+                : !signature
+                  ? "Draw and save your signature to continue"
                   : "Confirm & Approve  ✓"}
             </button>
           </div>

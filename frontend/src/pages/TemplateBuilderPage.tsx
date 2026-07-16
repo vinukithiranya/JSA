@@ -846,13 +846,14 @@ function TableColumnsPanel({ columns, onChange, onClose }: {
 
 // ─── Inline Logic Rule Row ─────────────────────────────────────────────────────
 
-function LogicRuleRow({ rule, question, isTitlePage, onUpdate, onDelete, onOpenConfig, onAddNested, onUpdateNested, onDeleteNested }: {
-  rule: LogicRule; question: Question; isTitlePage: boolean;
+function LogicRuleRow({ rule, question, isTitlePage, depth = 0, onUpdate, onDelete, onOpenConfig, onAddNested, onUpdateNested, onDeleteNested, onOpenPanel }: {
+  rule: LogicRule; question: Question; isTitlePage: boolean; depth?: number;
   onUpdate: (r: LogicRule) => void; onDelete: () => void;
   onOpenConfig: () => void;
   onAddNested: (type: ResponseType) => void;
   onUpdateNested: (idx: number, q: Question) => void;
   onDeleteNested: (idx: number) => void;
+  onOpenPanel: (qId: string, p: RightPanelState) => void;
 }) {
   const [showTypePicker, setShowTypePicker] = useState(false);
   const isMC = question.type === "multiple_choice";
@@ -915,9 +916,10 @@ function LogicRuleRow({ rule, question, isTitlePage, onUpdate, onDelete, onOpenC
       {rule.trigger === "ask_questions" && (
         <div className="ml-6 mt-1 border-l-2 border-indigo-200 pl-3">
           {nested.map((nq, ni) => (
-            <NestedQuestionCard key={nq.id} question={nq} isTitlePage={isTitlePage}
+            <NestedQuestionCard key={nq.id} question={nq} isTitlePage={isTitlePage} depth={depth}
               onUpdate={q => onUpdateNested(ni, q)}
-              onDelete={() => onDeleteNested(ni)} />
+              onDelete={() => onDeleteNested(ni)}
+              onOpenPanel={onOpenPanel} />
           ))}
           <div className="relative mt-1">
             <button onClick={() => setShowTypePicker(v => !v)}
@@ -944,13 +946,15 @@ function LogicRuleRow({ rule, question, isTitlePage, onUpdate, onDelete, onOpenC
 
 // ─── Nested Question Card ─────────────────────────────────────────────────────
 
-function NestedQuestionCard({ question, isTitlePage, onUpdate, onDelete }: {
-  question: Question; isTitlePage: boolean;
+function NestedQuestionCard({ question, isTitlePage, depth = 0, onUpdate, onDelete, onOpenPanel }: {
+  question: Question; isTitlePage: boolean; depth?: number;
   onUpdate: (q: Question) => void; onDelete: () => void;
+  onOpenPanel: (qId: string, p: RightPanelState) => void;
 }) {
   const [editing, setEditing] = useState(!question.text);
   const [draft, setDraft] = useState(question.text);
   const [showType, setShowType] = useState(false);
+  const indent = Math.min(depth, 4);
 
   function commit() {
     setEditing(false);
@@ -958,52 +962,109 @@ function NestedQuestionCard({ question, isTitlePage, onUpdate, onDelete }: {
     else setDraft(question.text);
   }
 
-  function changeType(t: ResponseType) {
-    const patch: Partial<Question> = { type: t };
-    if (t === "multiple_choice" && !question.option_meta?.length) {
-      const meta = defaultOptionMeta();
-      patch.option_meta = meta; patch.options = meta.map(m => m.label);
-    }
-    onUpdate(syncOptionArrays({ ...question, ...patch }));
+  function onSetPanel(p: RightPanelState) {
+    onOpenPanel(question.id, p);
   }
 
+  function changeType(t: ResponseType) {
+    const patch: Partial<Question> = { type: t };
+    if (t === "multiple_choice") {
+      if (!question.option_meta?.length) {
+        const meta = defaultOptionMeta();
+        patch.option_meta = meta; patch.options = meta.map(m => m.label);
+      }
+      onUpdate(syncOptionArrays({ ...question, ...patch }));
+      setShowType(false);
+      onSetPanel({ type: "mc_library" });
+      return;
+    }
+    if (t === "table" && !question.table_columns?.length) {
+      patch.table_columns = defaultTableColumns();
+    }
+    onUpdate(syncOptionArrays({ ...question, ...patch }));
+    setShowType(false);
+  }
+
+  function updateRule(id: string, r: LogicRule) {
+    onUpdate({ ...question, logic_rules: question.logic_rules?.map(x => x.id === id ? r : x) });
+  }
+  function deleteRule(id: string) {
+    onUpdate({ ...question, logic_rules: question.logic_rules?.filter(x => x.id !== id) });
+  }
+  function addNested(type: ResponseType) {
+    const nq: Question = { id: uid(), text: "", type, required: false };
+    if (type === "multiple_choice") { const meta = defaultOptionMeta(); nq.option_meta = meta; nq.options = meta.map(m => m.label); }
+    onUpdate({ ...question, nested_questions: [...(question.nested_questions ?? []), nq] });
+  }
+  function updateNested(idx: number, nq: Question) {
+    const nested = (question.nested_questions ?? []).map((q, i) => i === idx ? syncOptionArrays(nq) : q);
+    onUpdate({ ...question, nested_questions: nested });
+  }
+  function deleteNested(idx: number) {
+    onUpdate({ ...question, nested_questions: (question.nested_questions ?? []).filter((_, i) => i !== idx) });
+  }
+
+  const hasMcOptions = question.type === "multiple_choice" && (question.option_meta?.length ?? 0) > 0;
+
   return (
-    <div className="group mb-1.5 flex items-start gap-2 rounded-lg border border-indigo-100 bg-white px-3 py-2.5 shadow-sm">
-      <div className="flex-1">
-        {editing ? (
-          <input value={draft} autoFocus
-            onChange={e => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setEditing(false); setDraft(question.text); } }}
-            placeholder="Enter question…"
-            className="w-full rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-sm font-medium text-brand-900 outline-none focus:border-brand-500" />
-        ) : (
-          <p onClick={() => { setEditing(true); setDraft(question.text); }}
-            className={`cursor-text text-sm font-medium ${question.text ? "text-gray-800 hover:text-gray-600" : "italic text-gray-400"}`}>
-            {question.text || "Click to enter question…"}
-          </p>
-        )}
-        <div className="mt-1.5 flex items-center gap-2">
-          <div className="relative">
-            <button onClick={() => setShowType(v => !v)}
-              className="flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-100 transition">
-              {typeLabel(question.type)}
-              <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {showType && (
-              <TypePickerPanel isTitlePage={isTitlePage} current={question.type}
-                onSelect={changeType} onClose={() => setShowType(false)} />
+    <div className="group mb-1.5 overflow-hidden rounded-lg border border-indigo-100 bg-white shadow-sm" style={{ marginLeft: indent * 2 }}>
+      <div className="flex items-start gap-2 px-3 py-2.5">
+        <div className="flex-1">
+          {editing ? (
+            <input value={draft} autoFocus
+              onChange={e => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setEditing(false); setDraft(question.text); } }}
+              placeholder="Enter question…"
+              className="w-full rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-sm font-medium text-brand-900 outline-none focus:border-brand-500" />
+          ) : (
+            <p onClick={() => { setEditing(true); setDraft(question.text); }}
+              className={`cursor-text text-sm font-medium ${question.text ? "text-gray-800 hover:text-gray-600" : "italic text-gray-400"}`}>
+              {question.required && <span className="mr-0.5 text-red-500">*</span>}
+              {question.text || "Click to enter question…"}
+            </p>
+          )}
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className="relative">
+              <button onClick={() => setShowType(v => !v)}
+                className="flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-100 transition">
+                {typeLabel(question.type)}
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {showType && (
+                <TypePickerPanel isTitlePage={isTitlePage} current={question.type}
+                  onSelect={changeType} onClose={() => setShowType(false)} />
+              )}
+            </div>
+            {hasMcOptions && (
+              <button onClick={() => onSetPanel({ type: "mc_library" })}
+                className="rounded-md px-2 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 transition">
+                Edit responses
+              </button>
             )}
           </div>
-          <button onClick={() => onUpdate({ ...question, required: !question.required })}
-            className={`rounded-md px-2 py-0.5 text-xs font-medium transition ${question.required ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-            {question.required ? "Required" : "Optional"}
-          </button>
         </div>
+        <button onClick={onDelete} className="mt-0.5 opacity-0 group-hover:opacity-100 transition rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500">
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
       </div>
-      <button onClick={onDelete} className="mt-0.5 opacity-0 group-hover:opacity-100 transition rounded p-1 text-gray-300 hover:bg-red-50 hover:text-red-500">
-        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-      </button>
+
+      <ControlBar question={question} isTitlePage={isTitlePage} onUpdate={onUpdate} onSetPanel={onSetPanel} />
+
+      {(question.logic_rules ?? []).length > 0 && (
+        <div className="px-3 pb-2">
+          {(question.logic_rules ?? []).map(rule => (
+            <LogicRuleRow key={rule.id} rule={rule} question={question} isTitlePage={isTitlePage} depth={depth + 1}
+              onUpdate={r => updateRule(rule.id, r)}
+              onDelete={() => deleteRule(rule.id)}
+              onOpenConfig={() => onSetPanel({ type: "logic_config", ruleId: rule.id })}
+              onAddNested={addNested}
+              onUpdateNested={updateNested}
+              onDeleteNested={deleteNested}
+              onOpenPanel={onOpenPanel} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1229,10 +1290,11 @@ function ControlBar({ question, isTitlePage, onUpdate, onSetPanel }: {
 
 // ─── Question Row (table-style) ───────────────────────────────────────────────
 
-function QuestionRow({ question, isTitlePage, isActive, scoreEnabled, onUpdate, onDelete, onSetPanel, onActivate }: {
+function QuestionRow({ question, isTitlePage, isActive, scoreEnabled, onUpdate, onDelete, onSetPanel, onOpenPanel, onActivate }: {
   question: Question; isTitlePage: boolean; isActive: boolean; scoreEnabled: boolean;
   onUpdate: (q: Question) => void; onDelete: () => void;
   onSetPanel: (p: RightPanelState) => void;
+  onOpenPanel: (qId: string, p: RightPanelState) => void;
   onActivate: () => void;
 }) {
   const [showType, setShowType] = useState(false);
@@ -1414,7 +1476,8 @@ function QuestionRow({ question, isTitlePage, isActive, scoreEnabled, onUpdate, 
               onOpenConfig={() => onSetPanel({ type: "logic_config", ruleId: rule.id })}
               onAddNested={addNested}
               onUpdateNested={updateNested}
-              onDeleteNested={deleteNested} />
+              onDeleteNested={deleteNested}
+              onOpenPanel={onOpenPanel} />
           ))}
         </div>
       )}
@@ -1553,6 +1616,7 @@ function SectionBlock({ section, sectionIdx, totalSections, activePanelQ, sectio
                     onUpdate={updated => updateQuestion(qi, updated)}
                     onDelete={() => onUpdate({ ...section, questions: section.questions.filter((_, i) => i !== qi) })}
                     onSetPanel={panel => onSetPanel(panel ? { qId: q.id, panel } : null)}
+                    onOpenPanel={(qId, panel) => onSetPanel(panel ? { qId, panel } : null)}
                     onActivate={() => {}} />
                 ))}
               </div>
@@ -1715,18 +1779,37 @@ export default function TemplateBuilderPage({ user: _user, onLogout: _onLogout }
     updateSchema({ ...schema, sections });
   }
 
-  function findQuestion(qId: string): { q: Question | null; sIdx: number } {
-    for (let sIdx = 0; sIdx < schema.sections.length; sIdx++) {
-      const q = schema.sections[sIdx].questions.find(x => x.id === qId) ?? null;
-      if (q) return { q, sIdx };
+  function findQuestionDeep(questions: Question[], qId: string): Question | null {
+    for (const q of questions) {
+      if (q.id === qId) return q;
+      if (q.nested_questions?.length) {
+        const found = findQuestionDeep(q.nested_questions, qId);
+        if (found) return found;
+      }
     }
-    return { q: null, sIdx: -1 };
+    return null;
+  }
+
+  function findQuestion(qId: string): { q: Question | null } {
+    for (const s of schema.sections) {
+      const q = findQuestionDeep(s.questions, qId);
+      if (q) return { q };
+    }
+    return { q: null };
+  }
+
+  function updateQuestionDeep(questions: Question[], qId: string, updated: Question): Question[] {
+    return questions.map(q => {
+      if (q.id === qId) return syncOptionArrays(updated);
+      if (q.nested_questions?.length) {
+        return { ...q, nested_questions: updateQuestionDeep(q.nested_questions, qId, updated) };
+      }
+      return q;
+    });
   }
 
   function updatePanelQuestion(qId: string, updated: Question) {
-    const sections = schema.sections.map(s => ({
-      ...s, questions: s.questions.map(q => q.id === qId ? syncOptionArrays(updated) : q),
-    }));
+    const sections = schema.sections.map(s => ({ ...s, questions: updateQuestionDeep(s.questions, qId, updated) }));
     updateSchema({ ...schema, sections });
   }
 
