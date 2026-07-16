@@ -1,20 +1,23 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from app.core.db import Base, SessionLocal, engine
+from app.core.db import Base, SessionLocal, engine, get_db
 from app.models import db_models  # noqa: F401
 from app.routers import analytics, teams, actions, notifications, audit
-from app.routers import auth, dashboard, documents, forms, jsa, sync, templates
-from app.routers import issues, scheduling, inspections
+from app.routers import auth, dashboard, documents, templates
+from app.routers import issues, scheduling, inspections, sync
 from app.routers import assets, contractors, investigations, headsup, credentials
 from app.services.seed import seed_defaults
 
 
 def _run_migration(sql: str) -> None:
+    """Execute a SQL migration statement, silently ignoring errors."""
     with engine.connect() as conn:
         try:
             conn.execute(__import__("sqlalchemy").text(sql))
@@ -25,8 +28,8 @@ def _run_migration(sql: str) -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    """Initialize the database schema and seed defaults on application startup."""
     Base.metadata.create_all(bind=engine)
-    _run_migration("ALTER TABLE jsa_records ADD COLUMN supervisor_signature TEXT")
     _run_migration("ALTER TABLE actions ADD COLUMN priority VARCHAR(20) DEFAULT 'medium'")
     _run_migration("ALTER TABLE actions ADD COLUMN due_date DATE")
     _run_migration("ALTER TABLE actions ADD COLUMN labels JSON DEFAULT '[]'")
@@ -42,7 +45,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="RigPro JSA API", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="RigPro Inspection API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,16 +58,21 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Return a simple liveness status response (no DB check)."""
+    return {"status": "ok"}
+
+
+@app.get("/api/health")
+def api_health(db: Session = Depends(get_db)) -> dict[str, str]:
+    """Return liveness status after confirming the database is reachable."""
+    db.execute(text("SELECT 1"))
     return {"status": "ok"}
 
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(templates.router, prefix="/api/templates", tags=["templates"])
-app.include_router(forms.router, prefix="/api/forms", tags=["forms"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
-app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
-app.include_router(jsa.router, prefix="/api/jsa", tags=["jsa"])
 app.include_router(analytics.router, prefix="/api", tags=["analytics"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(actions.router, prefix="/api/actions", tags=["actions"])
@@ -73,6 +81,7 @@ app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(issues.router, prefix="/api/issues", tags=["issues"])
 app.include_router(scheduling.router, prefix="/api/schedules", tags=["schedules"])
 app.include_router(inspections.router, prefix="/api/inspections", tags=["inspections"])
+app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 app.include_router(contractors.router, prefix="/api/contractors", tags=["contractors"])
 app.include_router(investigations.router, prefix="/api/investigations", tags=["investigations"])
@@ -94,6 +103,7 @@ if _STATIC.is_dir():
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str) -> _FileResp:
+        """Serve the React SPA, falling back to index.html for unknown paths."""
         candidate = _STATIC / full_path
         target = candidate if candidate.is_file() else _STATIC / "index.html"
         return _FileResp(str(target))

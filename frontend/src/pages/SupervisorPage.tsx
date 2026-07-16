@@ -2,45 +2,34 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { api } from "../api";
-import type { InspectionRecord, JsaRecord, User } from "../types";
+import type { InspectionRecord, User } from "../types";
 
 type Props = { user: User | null; onLogout: () => void };
 
-type ApprovedInfo = { id: string; label: string; type: "jsa" | "inspection" };
-type PendingItem =
-  | { kind: "jsa"; data: JsaRecord }
-  | { kind: "inspection"; data: InspectionRecord };
-
+/** Renders the supervisor approval queue page for reviewing and signing pending inspection records. */
 export default function SupervisorPage({ user, onLogout }: Props) {
   const navigate                        = useNavigate();
-  const [items, setItems]               = useState<PendingItem[]>([]);
-  const [signingItem, setSigningItem]   = useState<PendingItem | null>(null);
-  const [approved, setApproved]         = useState<ApprovedInfo | null>(null);
+  const [items, setItems]               = useState<InspectionRecord[]>([]);
+  const [signingItem, setSigningItem]   = useState<InspectionRecord | null>(null);
+  const [approved, setApproved]         = useState<{ id: string; label: string } | null>(null);
   const [isEmpty, setIsEmpty]           = useState(true);
   const [approving, setApproving]       = useState(false);
   const canvasRef                       = useRef<HTMLCanvasElement>(null);
   const drawing                         = useRef(false);
 
+  /** Fetches pending inspection records from the API and updates the items list. */
   async function load() {
-    const [jsas, inspections] = await Promise.all([
-      api<JsaRecord[]>("/api/jsa"),
-      api<InspectionRecord[]>("/api/inspections"),
-    ]);
-    const pending: PendingItem[] = [
-      ...jsas
-        .filter((x) => x.status === "pending_approval")
-        .map((d): PendingItem => ({ kind: "jsa", data: d })),
-      ...inspections
-        .filter((x) => x.status === "pending_approval" || x.status === "completed")
-        .map((d): PendingItem => ({ kind: "inspection", data: d })),
-    ];
-    setItems(pending);
+    const inspections = await api<InspectionRecord[]>("/api/inspections");
+    setItems(
+      inspections.filter((x) => x.status === "pending_approval" || x.status === "completed")
+    );
   }
 
   useEffect(() => { load().catch(() => null); }, []);
 
   /* ── canvas helpers ─────────────────────────────────────────────────────── */
 
+  /** Clears the signature canvas and resets it to a white background. */
   function initCanvas() {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -51,12 +40,14 @@ export default function SupervisorPage({ user, onLogout }: Props) {
     setIsEmpty(true);
   }
 
-  function openSignModal(item: PendingItem) {
+  /** Opens the signature modal for the given inspection and initialises the canvas. */
+  function openSignModal(item: InspectionRecord) {
     setSigningItem(item);
     setIsEmpty(true);
     setTimeout(initCanvas, 60);
   }
 
+  /** Returns the canvas coordinates of a mouse or touch event, scaled to the canvas dimensions. */
   function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
     const rect   = canvas.getBoundingClientRect();
     const scaleX = canvas.width  / rect.width;
@@ -68,6 +59,7 @@ export default function SupervisorPage({ user, onLogout }: Props) {
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }
 
+  /** Begins a new drawing path on the canvas at the pointer position. */
   function startDraw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
     e.preventDefault();
     drawing.current = true;
@@ -80,6 +72,7 @@ export default function SupervisorPage({ user, onLogout }: Props) {
     ctx.moveTo(x, y);
   }
 
+  /** Draws a stroke on the canvas as the pointer moves, marking the signature as non-empty. */
   function draw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
     e.preventDefault();
     if (!drawing.current) return;
@@ -97,10 +90,12 @@ export default function SupervisorPage({ user, onLogout }: Props) {
     setIsEmpty(false);
   }
 
+  /** Stops the active drawing stroke on the canvas. */
   function stopDraw() { drawing.current = false; }
 
   /* ── approve ────────────────────────────────────────────────────────────── */
 
+  /** Submits the supervisor signature and approves the currently selected inspection record. */
   async function confirmApprove() {
     if (!signingItem || isEmpty) return;
     setApproving(true);
@@ -110,22 +105,11 @@ export default function SupervisorPage({ user, onLogout }: Props) {
       const signature = canvas.toDataURL("image/png");
       const supervisorName = user?.full_name ?? "Supervisor";
 
-      if (signingItem.kind === "jsa") {
-        const jsa = signingItem.data;
-        await api(`/api/jsa/${jsa.id}/approve`, {
-          method: "POST",
-          body: JSON.stringify({ signature, supervisor_name: supervisorName }),
-        });
-        setApproved({ id: jsa.id, label: `${jsa.job_number} — ${jsa.boat_name}`, type: "jsa" });
-      } else {
-        const insp = signingItem.data;
-        await api(`/api/inspections/${insp.id}/approve`, {
-          method: "POST",
-          body: JSON.stringify({ approved_by: supervisorName, signature }),
-        });
-        setApproved({ id: insp.id, label: insp.title || insp.template_name, type: "inspection" });
-      }
-
+      await api(`/api/inspections/${signingItem.id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ approved_by: supervisorName, signature }),
+      });
+      setApproved({ id: signingItem.id, label: signingItem.title || signingItem.template_name });
       setSigningItem(null);
       await load();
     } finally {
@@ -138,22 +122,6 @@ export default function SupervisorPage({ user, onLogout }: Props) {
     hour: "2-digit", minute: "2-digit",
   });
 
-  const totalCount = items.length;
-  const jsaCount   = items.filter((i) => i.kind === "jsa").length;
-  const inspCount  = items.filter((i) => i.kind === "inspection").length;
-
-  /* ── helpers ────────────────────────────────────────────────────────────── */
-
-  function itemLabel(item: PendingItem): string {
-    if (item.kind === "jsa") return `${item.data.job_number} — ${item.data.boat_name}`;
-    return item.data.title || item.data.template_name;
-  }
-
-  function signingLabel(): string {
-    if (!signingItem) return "";
-    return itemLabel(signingItem);
-  }
-
   /* ── render ─────────────────────────────────────────────────────────────── */
 
   return (
@@ -161,16 +129,9 @@ export default function SupervisorPage({ user, onLogout }: Props) {
 
       {/* ── Header row ─────────────────────────────────────────────────────── */}
       <div className="mb-4 flex items-center justify-between">
-        <div className="text-sm text-brand-600 space-x-3">
-          <span>
-            <span className="font-bold text-brand-900">{totalCount}</span>
-            {" "}item{totalCount !== 1 ? "s" : ""} pending approval
-          </span>
-          {totalCount > 0 && (
-            <span className="text-brand-400">
-              ({jsaCount} JSA{jsaCount !== 1 ? "s" : ""}, {inspCount} inspection{inspCount !== 1 ? "s" : ""})
-            </span>
-          )}
+        <div className="text-sm text-brand-600">
+          <span className="font-bold text-brand-900">{items.length}</span>
+          {" "}inspection{items.length !== 1 ? "s" : ""} pending approval
         </div>
         <button
           onClick={() => load().catch(() => null)}
@@ -188,97 +149,56 @@ export default function SupervisorPage({ user, onLogout }: Props) {
         </div>
       ) : (
         <div className="space-y-3">
-          {items.map((item) =>
-            item.kind === "jsa" ? (
-              /* ── JSA card ── */
-              <article
-                key={`jsa-${item.data.id}`}
-                className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-700">JSA</span>
-                      <h3 className="text-sm font-bold text-brand-900">{item.data.job_number}</h3>
-                      <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Pending</span>
-                    </div>
-                    <p className="mt-0.5 text-sm text-brand-700">{item.data.boat_name}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-brand-500">
-                      <span>SL: {item.data.service_log_number}</span>
-                      <span>📍 {item.data.location}</span>
-                      <span>📅 {String(item.data.date)}</span>
-                      <span>{item.data.hazards.length} hazard{item.data.hazards.length !== 1 ? "s" : ""}</span>
-                      <span>{item.data.steps.length} steps</span>
-                    </div>
+          {items.map((item) => (
+            <article
+              key={item.id}
+              className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">Inspection</span>
+                    <h3 className="text-sm font-bold text-brand-900">
+                      {item.title || item.template_name}
+                    </h3>
+                    <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Pending</span>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-                    <button
-                      onClick={() => navigate(`/jsa/report/${item.data.id}`)}
-                      className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs font-semibold text-brand-800 transition-colors hover:bg-brand-50"
-                    >
-                      View Report
-                    </button>
-                    <button
-                      onClick={() => openSignModal(item)}
-                      className="rounded-lg bg-brand-700 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-800"
-                    >
-                      Sign &amp; Approve
-                    </button>
+                  <p className="mt-0.5 text-sm text-brand-700">{item.template_name}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-brand-500">
+                    {item.site && <span>📍 {item.site}</span>}
+                    {item.completed_at && (
+                      <span>📅 {new Date(item.completed_at).toLocaleDateString("en-AU")}</span>
+                    )}
+                    {item.score !== null && (
+                      <span className={`font-semibold ${item.score >= 70 ? "text-green-600" : "text-red-600"}`}>
+                        Score: {item.score}%
+                      </span>
+                    )}
+                    {(item.flagged_items as unknown[]).length > 0 && (
+                      <span className="text-red-500">
+                        ⚑ {(item.flagged_items as unknown[]).length} flag{(item.flagged_items as unknown[]).length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    <span>{item.answered_questions}/{item.total_questions} answered</span>
                   </div>
                 </div>
-              </article>
-            ) : (
-              /* ── Inspection card ── */
-              <article
-                key={`insp-${item.data.id}`}
-                className="rounded-xl border border-brand-100 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">Inspection</span>
-                      <h3 className="text-sm font-bold text-brand-900">
-                        {item.data.title || item.data.template_name}
-                      </h3>
-                      <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Pending</span>
-                    </div>
-                    <p className="mt-0.5 text-sm text-brand-700">{item.data.template_name}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-brand-500">
-                      {item.data.site && <span>📍 {item.data.site}</span>}
-                      {item.data.completed_at && (
-                        <span>📅 {new Date(item.data.completed_at).toLocaleDateString("en-AU")}</span>
-                      )}
-                      {item.data.score !== null && (
-                        <span className={`font-semibold ${item.data.score >= 70 ? "text-green-600" : "text-red-600"}`}>
-                          Score: {item.data.score}%
-                        </span>
-                      )}
-                      {(item.data.flagged_items as unknown[]).length > 0 && (
-                        <span className="text-red-500">
-                          ⚑ {(item.data.flagged_items as unknown[]).length} flag{(item.data.flagged_items as unknown[]).length !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                      <span>{item.data.answered_questions}/{item.data.total_questions} answered</span>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-                    <button
-                      onClick={() => navigate(`/inspections/report/${item.data.id}`)}
-                      className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs font-semibold text-brand-800 transition-colors hover:bg-brand-50"
-                    >
-                      View Report
-                    </button>
-                    <button
-                      onClick={() => openSignModal(item)}
-                      className="rounded-lg bg-brand-700 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-800"
-                    >
-                      Sign &amp; Approve
-                    </button>
-                  </div>
+                <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                  <button
+                    onClick={() => navigate(`/inspections/report/${item.id}`)}
+                    className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs font-semibold text-brand-800 transition-colors hover:bg-brand-50"
+                  >
+                    View Report
+                  </button>
+                  <button
+                    onClick={() => openSignModal(item)}
+                    className="rounded-lg bg-brand-700 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-800"
+                  >
+                    Sign &amp; Approve
+                  </button>
                 </div>
-              </article>
-            )
-          )}
+              </div>
+            </article>
+          ))}
         </div>
       )}
 
@@ -295,7 +215,7 @@ export default function SupervisorPage({ user, onLogout }: Props) {
           >
             <div>
               <h2 className="text-base font-bold text-white">Supervisor Approval</h2>
-              <p className="text-xs text-green-100">{signingLabel()}</p>
+              <p className="text-xs text-green-100">{signingItem.title || signingItem.template_name}</p>
             </div>
             <button
               onClick={() => setSigningItem(null)}
@@ -328,30 +248,17 @@ export default function SupervisorPage({ user, onLogout }: Props) {
 
             {/* Item summary */}
             <div className="rounded-xl border border-brand-100 bg-white px-4 py-3 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-wider text-brand-500 mb-2">
-                {signingItem.kind === "jsa" ? "JSA Summary" : "Inspection Summary"}
-              </p>
-              {signingItem.kind === "jsa" ? (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-brand-700 sm:grid-cols-3">
-                  <div><span className="font-semibold">Job:</span> {signingItem.data.job_number}</div>
-                  <div><span className="font-semibold">Vessel:</span> {signingItem.data.boat_name}</div>
-                  <div><span className="font-semibold">Location:</span> {signingItem.data.location}</div>
-                  <div><span className="font-semibold">Date:</span> {String(signingItem.data.date)}</div>
-                  <div><span className="font-semibold">Steps:</span> {signingItem.data.steps.length}</div>
-                  <div><span className="font-semibold">Hazards:</span> {signingItem.data.hazards.length}</div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-brand-700 sm:grid-cols-3">
-                  <div><span className="font-semibold">Title:</span> {signingItem.data.title || signingItem.data.template_name}</div>
-                  <div><span className="font-semibold">Template:</span> {signingItem.data.template_name}</div>
-                  {signingItem.data.site && <div><span className="font-semibold">Site:</span> {signingItem.data.site}</div>}
-                  {signingItem.data.score !== null && (
-                    <div><span className="font-semibold">Score:</span> {signingItem.data.score}%</div>
-                  )}
-                  <div><span className="font-semibold">Answered:</span> {signingItem.data.answered_questions}/{signingItem.data.total_questions}</div>
-                  <div><span className="font-semibold">Flags:</span> {(signingItem.data.flagged_items as unknown[]).length}</div>
-                </div>
-              )}
+              <p className="text-xs font-bold uppercase tracking-wider text-brand-500 mb-2">Inspection Summary</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-brand-700 sm:grid-cols-3">
+                <div><span className="font-semibold">Title:</span> {signingItem.title || signingItem.template_name}</div>
+                <div><span className="font-semibold">Template:</span> {signingItem.template_name}</div>
+                {signingItem.site && <div><span className="font-semibold">Site:</span> {signingItem.site}</div>}
+                {signingItem.score !== null && (
+                  <div><span className="font-semibold">Score:</span> {signingItem.score}%</div>
+                )}
+                <div><span className="font-semibold">Answered:</span> {signingItem.answered_questions}/{signingItem.total_questions}</div>
+                <div><span className="font-semibold">Flags:</span> {(signingItem.flagged_items as unknown[]).length}</div>
+              </div>
             </div>
 
             {/* Signature pad */}
@@ -397,9 +304,7 @@ export default function SupervisorPage({ user, onLogout }: Props) {
 
             {/* Legal acknowledgement */}
             <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
-              {signingItem.kind === "jsa"
-                ? "By signing above you confirm that you have reviewed this Job Safety Assessment and approve it for execution. This approval is legally binding under the applicable safety management system."
-                : "By signing above you confirm that you have reviewed this Inspection report and approve it. This approval is recorded in the safety management system."}
+              By signing above you confirm that you have reviewed this Inspection report and approve it. This approval is recorded in the safety management system.
             </div>
           </div>
 
@@ -429,9 +334,7 @@ export default function SupervisorPage({ user, onLogout }: Props) {
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
             <div className="px-6 py-8 text-center" style={{ background: "#377133" }}>
               <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-white/20 text-3xl">✓</div>
-              <h2 className="text-xl font-bold text-white">
-                {approved.type === "jsa" ? "JSA" : "Inspection"} Approved!
-              </h2>
+              <h2 className="text-xl font-bold text-white">Inspection Approved!</h2>
               <p className="mt-1 text-sm text-green-100">{approved.label}</p>
             </div>
             <div className="px-6 py-5 space-y-4">
@@ -442,11 +345,8 @@ export default function SupervisorPage({ user, onLogout }: Props) {
               </div>
               <button
                 onClick={() => {
-                  const path = approved.type === "jsa"
-                    ? `/jsa/report/${approved.id}`
-                    : `/inspections/report/${approved.id}`;
                   setApproved(null);
-                  navigate(path);
+                  navigate(`/inspections/report/${approved.id}`);
                 }}
                 className="flex items-center justify-center gap-2 w-full rounded-xl py-4 text-sm font-bold text-white transition-colors"
                 style={{ background: "#377133" }}

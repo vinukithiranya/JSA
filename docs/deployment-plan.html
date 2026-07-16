@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RigPro → Northsails Deployment Plan (Summary)</title>
+<style>
+  :root {
+    --bg-primary: #0f1420;
+    --bg-secondary: #161c2c;
+    --border: #2a3348;
+    --border-light: #33405c;
+    --text-primary: #e8ecf4;
+    --text-secondary: #b4bdd1;
+    --text-muted: #7c88a3;
+    --accent-blue: #60a5fa;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-green-bg: rgba(74,222,128,0.1);
+    --accent-amber-bg: rgba(251,191,36,0.1);
+    --accent-red-bg: rgba(248,113,113,0.1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .doc-container { max-width: 820px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { color: var(--text-primary); font-size: 24px; margin: 8px 0 10px; }
+  h2 {
+    color: var(--text-primary);
+    font-size: 17px;
+    margin: 34px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  p { margin: 8px 0; }
+  code {
+    background: rgba(148,163,184,0.12);
+    color: var(--accent-blue);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: "SF Mono", Consolas, Menlo, monospace;
+  }
+  strong { color: var(--text-primary); }
+
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-right: 8px;
+  }
+  .tag-date { background: rgba(96,165,250,0.12); color: var(--accent-blue); }
+  .tag-current { background: var(--accent-amber-bg); color: var(--accent-amber); }
+
+  ul { list-style: none; padding-left: 0; margin: 8px 0; }
+  li {
+    position: relative;
+    padding: 7px 10px 7px 30px;
+    margin: 2px 0;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  li:hover { background: rgba(148,163,184,0.06); }
+  .done li::before {
+    content: '✓';
+    position: absolute;
+    left: 8px;
+    color: var(--accent-green);
+    font-weight: 700;
+  }
+  .gap li::before {
+    content: '○';
+    position: absolute;
+    left: 8px;
+    font-weight: 700;
+  }
+  .gap li.partial::before { color: var(--accent-amber); }
+  .gap li.blocked::before { color: var(--accent-red); }
+
+  .status {
+    display: inline-block;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    padding: 1px 7px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+  .status-partial { background: var(--accent-amber-bg); color: var(--accent-amber); border: 1px solid rgba(251,191,36,0.3); }
+  .status-blocked { background: var(--accent-red-bg); color: var(--accent-red); border: 1px solid rgba(248,113,113,0.3); }
+
+  .group-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 16px 0 4px;
+  }
+
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; width: 26%; }
+
+  .doc-footer {
+    margin-top: 50px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg-primary: #f7f8fb;
+      --bg-secondary: #ffffff;
+      --border: #e2e6ee;
+      --border-light: #d7dce6;
+      --text-primary: #1a2033;
+      --text-secondary: #3d4560;
+      --text-muted: #7a8299;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="doc-container">
+
+  <h1>RigPro → Northsails Deployment Plan — Summary</h1>
+  <div>
+    <span class="tag tag-date">July 2026</span>
+    <span class="tag tag-current">In progress</span>
+  </div>
+  <p style="margin-top:12px;color:var(--text-muted);font-size:13.5px;">
+    Short-form status against the Northsails standard (<code>cicd-architecture.html</code> + <code>development-guide.html</code>).
+    For full step-by-step fixes, see <code>docs/northsails-deployment-plan.html</code>.
+  </p>
+
+  <h2>Resolved</h2>
+  <ul class="done">
+    <li>Passwords hashed with bcrypt instead of plaintext comparison</li>
+    <li>JWT login + <code>get_current_user</code> + <code>GET /api/auth/me</code> built and verified</li>
+    <li>CORS locked to a configured origin list</li>
+    <li><code>GET /api/health</code> with a real DB ping</li>
+    <li>Env-driven config (<code>core/config.py</code> + <code>.env.example</code>)</li>
+    <li><code>frontend/package.json</code> has a <code>build:deploy</code> script</li>
+    <li>GitHub Actions CI (build + test) on every push/PR</li>
+    <li>Full <code>repositories/</code> layer across all 17 domains — SQL out of routers/services, verified end-to-end</li>
+    <li>Design-first doc templates added</li>
+    <li>Local <code>dev</code> branch created; leaked PAT stripped from local git config</li>
+  </ul>
+
+  <h2>Remaining Gaps</h2>
+
+  <div class="group-title">Security</div>
+  <ul class="gap">
+    <li class="partial">Auth not enforced on the other 17 routers yet <span class="status status-partial">PARTIAL</span></li>
+    <li class="partial">Leaked GitHub PAT stripped locally, not yet revoked on GitHub <span class="status status-partial">PARTIAL</span></li>
+    <li class="partial">Example password placeholdered; not confirmed whether it was ever live <span class="status status-partial">PARTIAL</span></li>
+  </ul>
+
+  <div class="group-title">Git &amp; Branching</div>
+  <ul class="gap">
+    <li class="partial"><code>dev</code> branch not pushed; no branch protection; stray branches/worktrees not cleaned up <span class="status status-partial">PARTIAL</span></li>
+  </ul>
+
+  <div class="group-title">Database</div>
+  <ul class="gap">
+    <li class="blocked">No Alembic — schema still managed by raw <code>ALTER TABLE</code> at startup <span class="status status-blocked">NOT STARTED</span></li>
+  </ul>
+
+  <div class="group-title">Azure DevOps CI/CD (blocked on Open Decisions 1 &amp; 2)</div>
+  <ul class="gap">
+    <li class="blocked">No deploy pipeline, no DEV/PROD resources, no service connections/environments/approvals, no secrets variable group <span class="status status-blocked">NOT STARTED</span></li>
+  </ul>
+
+  <div class="group-title">Layering &amp; Conventions</div>
+  <ul class="gap">
+    <li class="blocked">Audit columns cleanup — needs Alembic first <span class="status status-blocked">NOT STARTED</span></li>
+    <li class="blocked">Multi-company / UUID PK — needs stakeholder decision <span class="status status-blocked">NOT STARTED</span></li>
+    <li class="blocked">Backfill docs for existing services (templates exist) <span class="status status-blocked">NOT STARTED</span></li>
+  </ul>
+
+  <h2>Open Decisions</h2>
+  <table>
+    <tbody>
+      <tr><th>1. Docker vs. ZIP deploy</th><td>Keep current Docker image, or switch to ZIP deploy to match the reference pipeline?</td></tr>
+      <tr><th>2. ADO vs. GitHub</th><td>Move to <code>northsails.visualstudio.com</code>, or run pipelines from the existing GitHub repo?</td></tr>
+      <tr><th>3. Multi-company?</th><td>Adopt <code>company_id</code> on all tables, or stay single-tenant?</td></tr>
+      <tr><th>4. UUID PKs?</th><td>Migrate string IDs to UUIDs, or keep as-is?</td></tr>
+    </tbody>
+  </table>
+
+  <div class="doc-footer">RigPro — Northsails Deployment Plan (Summary) — July 2026</div>
+</div>
+</body>
+</html>

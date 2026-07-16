@@ -33,6 +33,7 @@ const CREDENTIAL_TYPES = [
 
 type CredStatus = "valid" | "expiring" | "expired" | "no-expiry";
 
+/** Returns the validity status of a credential based on its expiry date. */
 function getCredStatus(expiry_date: string | null): CredStatus {
   if (!expiry_date) return "no-expiry";
   const exp = new Date(expiry_date);
@@ -65,6 +66,7 @@ const ROW_BG: Record<CredStatus, string> = {
   "no-expiry": "",
 };
 
+/** Formats a date string as a human-readable AU locale date, or returns "—" for null. */
 const fmt = (d: string | null) => {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
@@ -80,6 +82,7 @@ const EMPTY_FORM = {
   notes: "",
 };
 
+/** Renders the credentials management page for tracking staff licenses and certifications. */
 export default function CredentialsPage({ user, onLogout }: Props) {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [filterStatus, setFilterStatus] = useState("all");

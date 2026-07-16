@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models.db_models import ScheduleDB, ScheduleOccurrenceDB
+from app.repositories import schedules_repository as repo
 from app.schemas.models import (
     OccurrenceComplete,
     OccurrenceOut,
@@ -16,7 +16,7 @@ from app.services.store import new_id
 router = APIRouter()
 
 
-def _generate_occurrences(schedule: ScheduleDB, count: int = 8) -> list[date]:
+def _generate_occurrences(schedule, count: int = 8) -> list[date]:
     """Generate next N occurrence dates from today based on schedule frequency."""
     today = date.today()
     start = max(schedule.start_date, today)
@@ -44,7 +44,8 @@ def _generate_occurrences(schedule: ScheduleDB, count: int = 8) -> list[date]:
     return dates
 
 
-def _to_schedule_out(row: ScheduleDB) -> ScheduleOut:
+def _to_schedule_out(row) -> ScheduleOut:
+    """Convert a ScheduleDB ORM row to a ScheduleOut response model."""
     return ScheduleOut(
         id=row.id,
         title=row.title,
@@ -62,7 +63,8 @@ def _to_schedule_out(row: ScheduleDB) -> ScheduleOut:
     )
 
 
-def _to_occ_out(row: ScheduleOccurrenceDB) -> OccurrenceOut:
+def _to_occ_out(row) -> OccurrenceOut:
+    """Convert a ScheduleOccurrenceDB ORM row to an OccurrenceOut response model."""
     return OccurrenceOut(
         id=row.id,
         schedule_id=row.schedule_id,
@@ -80,13 +82,16 @@ def _to_occ_out(row: ScheduleOccurrenceDB) -> OccurrenceOut:
 
 @router.get("", response_model=list[ScheduleOut])
 def list_schedules(db: Session = Depends(get_db)) -> list[ScheduleOut]:
-    rows = db.query(ScheduleDB).order_by(ScheduleDB.created_at.desc()).all()
+    """Return all schedules ordered by creation date descending."""
+    rows = repo.list_schedules(db)
     return [_to_schedule_out(r) for r in rows]
 
 
 @router.post("", response_model=ScheduleOut)
 def create_schedule(payload: ScheduleCreate, db: Session = Depends(get_db)) -> ScheduleOut:
-    row = ScheduleDB(
+    """Create a new schedule and pre-generate its first 8 occurrences."""
+    row = repo.create_schedule(
+        db,
         id=new_id("sch"),
         title=payload.title,
         template_id=payload.template_id,
@@ -100,21 +105,18 @@ def create_schedule(payload: ScheduleCreate, db: Session = Depends(get_db)) -> S
         is_active=True,
         created_by=payload.created_by,
     )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
 
     # Pre-generate first 8 occurrences
     occ_dates = _generate_occurrences(row, count=8)
     for d in occ_dates:
-        occ = ScheduleOccurrenceDB(
+        repo.add_occurrence(
+            db,
             id=new_id("occ"),
             schedule_id=row.id,
             schedule_title=row.title,
             due_date=d,
             status="pending",
         )
-        db.add(occ)
     db.commit()
 
     return _to_schedule_out(row)
@@ -122,7 +124,8 @@ def create_schedule(payload: ScheduleCreate, db: Session = Depends(get_db)) -> S
 
 @router.get("/{schedule_id}", response_model=ScheduleOut)
 def get_schedule(schedule_id: str, db: Session = Depends(get_db)) -> ScheduleOut:
-    row = db.query(ScheduleDB).filter(ScheduleDB.id == schedule_id).first()
+    """Retrieve a single schedule by its ID."""
+    row = repo.get_schedule(db, schedule_id)
     if not row:
         raise HTTPException(status_code=404, detail="Schedule not found")
     return _to_schedule_out(row)
@@ -130,7 +133,8 @@ def get_schedule(schedule_id: str, db: Session = Depends(get_db)) -> ScheduleOut
 
 @router.patch("/{schedule_id}/toggle", response_model=ScheduleOut)
 def toggle_schedule(schedule_id: str, db: Session = Depends(get_db)) -> ScheduleOut:
-    row = db.query(ScheduleDB).filter(ScheduleDB.id == schedule_id).first()
+    """Toggle the active status of a schedule."""
+    row = repo.get_schedule(db, schedule_id)
     if not row:
         raise HTTPException(status_code=404, detail="Schedule not found")
     row.is_active = not row.is_active
@@ -141,11 +145,12 @@ def toggle_schedule(schedule_id: str, db: Session = Depends(get_db)) -> Schedule
 
 @router.delete("/{schedule_id}", status_code=204)
 def delete_schedule(schedule_id: str, db: Session = Depends(get_db)) -> None:
-    row = db.query(ScheduleDB).filter(ScheduleDB.id == schedule_id).first()
+    """Delete a schedule and all its associated occurrences."""
+    row = repo.get_schedule(db, schedule_id)
     if not row:
         raise HTTPException(status_code=404, detail="Schedule not found")
-    db.query(ScheduleOccurrenceDB).filter(ScheduleOccurrenceDB.schedule_id == schedule_id).delete()
-    db.delete(row)
+    repo.delete_occurrences_for_schedule(db, schedule_id)
+    repo.delete_schedule(db, row)
     db.commit()
 
 
@@ -153,12 +158,8 @@ def delete_schedule(schedule_id: str, db: Session = Depends(get_db)) -> None:
 
 @router.get("/{schedule_id}/occurrences", response_model=list[OccurrenceOut])
 def list_occurrences(schedule_id: str, db: Session = Depends(get_db)) -> list[OccurrenceOut]:
-    rows = (
-        db.query(ScheduleOccurrenceDB)
-        .filter(ScheduleOccurrenceDB.schedule_id == schedule_id)
-        .order_by(ScheduleOccurrenceDB.due_date.asc())
-        .all()
-    )
+    """Return all occurrences for a given schedule ordered by due date ascending."""
+    rows = repo.list_occurrences(db, schedule_id)
     return [_to_occ_out(r) for r in rows]
 
 
@@ -167,12 +168,10 @@ def list_all_occurrences(
     status: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[OccurrenceOut]:
-    q = db.query(ScheduleOccurrenceDB)
-    if status:
-        q = q.filter(ScheduleOccurrenceDB.status == status)
+    """Return all occurrences across schedules, optionally filtered by status, marking overdue ones."""
     # Mark overdue occurrences
     today = date.today()
-    rows = q.order_by(ScheduleOccurrenceDB.due_date.asc()).all()
+    rows = repo.list_all_occurrences(db, status=status)
     for r in rows:
         if r.status == "pending" and r.due_date < today:
             r.status = "overdue"
@@ -184,7 +183,8 @@ def list_all_occurrences(
 def complete_occurrence(
     occ_id: str, payload: OccurrenceComplete, db: Session = Depends(get_db)
 ) -> OccurrenceOut:
-    row = db.query(ScheduleOccurrenceDB).filter(ScheduleOccurrenceDB.id == occ_id).first()
+    """Mark a schedule occurrence as completed with the given completion details."""
+    row = repo.get_occurrence(db, occ_id)
     if not row:
         raise HTTPException(status_code=404, detail="Occurrence not found")
     row.status = "completed"
@@ -199,7 +199,8 @@ def complete_occurrence(
 
 @router.patch("/occurrences/{occ_id}/miss", response_model=OccurrenceOut)
 def miss_occurrence(occ_id: str, db: Session = Depends(get_db)) -> OccurrenceOut:
-    row = db.query(ScheduleOccurrenceDB).filter(ScheduleOccurrenceDB.id == occ_id).first()
+    """Mark a schedule occurrence as missed."""
+    row = repo.get_occurrence(db, occ_id)
     if not row:
         raise HTTPException(status_code=404, detail="Occurrence not found")
     row.status = "missed"

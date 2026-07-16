@@ -42,6 +42,7 @@ type Tab = "overview" | "inspections" | "issues" | "actions";
 
 // ── Chart primitives ────────────────────────────────────────────────
 
+/** Renders a small SVG bar chart from an array of numeric values. */
 function MiniBarChart({ data, color = "#499241" }: { data: number[]; color?: string }) {
   const max = Math.max(...data, 1);
   const W = 110;
@@ -61,6 +62,7 @@ function MiniBarChart({ data, color = "#499241" }: { data: number[]; color?: str
   );
 }
 
+/** Renders a small SVG line chart with a gradient fill from an array of numeric values. */
 function MiniLineChart({ data, color = "#499241" }: { data: number[]; color?: string }) {
   if (data.length < 2) return null;
   const max = Math.max(...data, 1);
@@ -89,6 +91,7 @@ function MiniLineChart({ data, color = "#499241" }: { data: number[]; color?: st
   );
 }
 
+/** Renders an SVG donut chart from an array of labeled, colored segments. */
 function DonutChart({ segments, size = 130 }: {
   segments: { value: number; color: string; label: string }[];
   size?: number;
@@ -126,6 +129,7 @@ function DonutChart({ segments, size = 130 }: {
 
 // ── Reusable sub-components ─────────────────────────────────────────
 
+/** Renders a centered loading spinner animation. */
 function Spinner() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -134,6 +138,7 @@ function Spinner() {
   );
 }
 
+/** Renders a labeled horizontal bar row scaled relative to a maximum value. */
 function BarRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
@@ -147,6 +152,7 @@ function BarRow({ label, value, max, color }: { label: string; value: number; ma
   );
 }
 
+/** Renders a labeled progress bar showing a percentage value. */
 function ProgressBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="space-y-1">
@@ -163,6 +169,7 @@ function ProgressBar({ label, value, color }: { label: string; value: number; co
 
 // ── Up/down trend badge ─────────────────────────────────────────────
 
+/** Renders a colored badge indicating an upward or downward trend with a label. */
 function TrendBadge({ up, label }: { up: boolean; label: string }) {
   return (
     <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${up ? "bg-brand-100 text-brand-700" : "bg-red-100 text-red-700"}`}>
@@ -180,6 +187,7 @@ function TrendBadge({ up, label }: { up: boolean; label: string }) {
 
 // ── Main page ───────────────────────────────────────────────────────
 
+/** Renders the Analytics page with tabbed views for overview, inspections, issues, and actions statistics. */
 export default function AnalyticsPage({ user, onLogout }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const [summary, setSummary] = useState<Summary | null>(null);

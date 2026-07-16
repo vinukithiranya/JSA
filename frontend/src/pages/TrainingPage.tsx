@@ -185,11 +185,13 @@ const PROGRESS_LABELS = {
   completed: "Completed",
 };
 
+/** Returns true if the training entry is past its due date and not yet completed. */
 function isOverdue(entry: MyTrainingEntry): boolean {
   if (entry.progress === "completed") return false;
   return new Date(entry.due_date) < new Date();
 }
 
+/** Renders the Training page with a Courses tab and a My Training tab, including a course detail modal. */
 export default function TrainingPage({ user, onLogout }: Props) {
   const [tab, setTab] = useState<"courses" | "my_training">("courses");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);

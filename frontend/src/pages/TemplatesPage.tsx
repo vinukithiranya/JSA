@@ -17,10 +17,12 @@ const CATEGORY_COLORS: Record<string, string> = {
   training: "bg-yellow-100 text-yellow-700",
 };
 
+/** Returns the Tailwind color classes for a given template category. */
 function categoryColor(cat: string): string {
   return CATEGORY_COLORS[cat?.toLowerCase()] ?? "bg-brand-100 text-brand-700";
 }
 
+/** Returns the total number of questions across all sections of a template. */
 function countFields(t: FormTemplate): number {
   return (
     t.form_schema?.sections?.reduce(
@@ -30,36 +32,42 @@ function countFields(t: FormTemplate): number {
   );
 }
 
+/** Returns the number of sections defined in a template's form schema. */
 function countSections(t: FormTemplate): number {
   return t.form_schema?.sections?.length ?? 0;
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
+/** Renders a grid view toggle icon. */
 const GridIcon = () => (
   <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
   </svg>
 );
 
+/** Renders a list view toggle icon. */
 const ListIcon = () => (
   <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
   </svg>
 );
 
+/** Renders a search magnifier icon. */
 const SearchIcon = () => (
   <svg className="h-4 w-4 text-brand-400" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
   </svg>
 );
 
+/** Renders a template document layout icon. */
 const TemplateIcon = () => (
   <svg className="h-10 w-10 text-brand-300" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
   </svg>
 );
 
+/** Renders a play/start circle icon. */
 const PlayIcon = () => (
   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -67,6 +75,7 @@ const PlayIcon = () => (
   </svg>
 );
 
+/** Renders a vertical three-dot overflow menu icon. */
 const DotsIcon = () => (
   <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
     <path d="M12 5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 7a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 7a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
@@ -82,6 +91,7 @@ interface StartModalProps {
   loading: boolean;
 }
 
+/** Renders a modal dialog that prompts the user for a site/location before starting an inspection. */
 function StartModal({ template, onClose, onStart, loading }: StartModalProps) {
   const [site, setSite] = useState("");
 
@@ -133,6 +143,7 @@ function StartModal({ template, onClose, onStart, loading }: StartModalProps) {
 
 // ── Template Card (Grid view) ─────────────────────────────────────────────────
 
+/** Renders a card displaying a template's details with actions for starting, editing, duplicating, and archiving. */
 function TemplateCard({
   template,
   onStart,
@@ -221,6 +232,7 @@ function TemplateCard({
 
 // ── Template Row (List view) ──────────────────────────────────────────────────
 
+/** Renders a table row displaying a template's details with actions for starting, editing, duplicating, and archiving. */
 function TemplateRow({
   template,
   onStart,
@@ -301,6 +313,7 @@ function TemplateRow({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+/** Renders the Templates page with search, category filtering, grid/list views, and actions to start, edit, duplicate, or archive templates. */
 export default function TemplatesPage({ user, onLogout }: Props) {
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<FormTemplate[]>([]);

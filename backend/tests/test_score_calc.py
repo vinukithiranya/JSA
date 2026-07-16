@@ -11,6 +11,7 @@ from app.routers.inspections import _calc_score
 # ── Basic scoring ─────────────────────────────────────────────────────────────
 
 def test_perfect_score_all_yes():
+    """Returns 100.0 when all answers earn maximum points."""
     schema = {"sections": [{"questions": [
         {"id": "q1", "type": "multiple_choice", "score_map": {"Yes": 10, "No": 0}},
         {"id": "q2", "type": "multiple_choice", "score_map": {"Yes": 10, "No": 0}},
@@ -23,6 +24,7 @@ def test_perfect_score_all_yes():
 
 
 def test_zero_score_all_no():
+    """Returns 0.0 when all answers earn zero points."""
     schema = {"sections": [{"questions": [
         {"id": "q1", "type": "multiple_choice", "score_map": {"Yes": 10, "No": 0}},
         {"id": "q2", "type": "multiple_choice", "score_map": {"Yes": 10, "No": 0}},
@@ -35,6 +37,7 @@ def test_zero_score_all_no():
 
 
 def test_partial_score_mixed_answers():
+    """Returns 50.0 when half the questions earn maximum points."""
     schema = {"sections": [{"questions": [
         {"id": "q1", "type": "multiple_choice", "score_map": {"Yes": 10, "No": 0}},
         {"id": "q2", "type": "multiple_choice", "score_map": {"Yes": 10, "No": 0}},
@@ -65,6 +68,7 @@ def test_unequal_weights():
 
 
 def test_partial_answers_unanswered_count_as_zero():
+    """Returns 50.0 when one of two questions is unanswered (counts as zero earned)."""
     schema = {"sections": [{"questions": [
         {"id": "q1", "type": "multiple_choice", "score_map": {"Yes": 10, "No": 0}},
         {"id": "q2", "type": "multiple_choice", "score_map": {"Yes": 10, "No": 0}},
@@ -85,6 +89,7 @@ def test_no_scored_questions_returns_100():
 
 
 def test_empty_schema_returns_100():
+    """Returns 100.0 for an empty schema with no questions."""
     assert _calc_score({}, {}) == 100.0
 
 
@@ -112,6 +117,7 @@ def test_score_below_70_threshold():
 
 
 def test_score_above_70_threshold():
+    """Returns 80.0 when 8 of 10 equal-weight questions are answered correctly."""
     schema = {"sections": [{"questions": [
         {"id": f"q{i}", "type": "multiple_choice", "score_map": {"Yes": 10, "No": 0}}
         for i in range(10)

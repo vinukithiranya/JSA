@@ -20,6 +20,7 @@ from app.services.notifications import notify, notify_supervisors
 
 @pytest.fixture
 def db():
+    """Provide an in-memory SQLite session seeded with test users."""
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
     Session = sessionmaker(bind=engine)
@@ -36,6 +37,7 @@ def db():
 # ── notify() ──────────────────────────────────────────────────────────────────
 
 def test_notify_creates_notification(db):
+    """Verify that notify() creates a notification record with correct fields."""
     notify(db, "u-tech", "Test message", event_type="info", link="/dashboard")
     db.commit()
     result = db.query(NotificationDB).filter(NotificationDB.user_id == "u-tech").all()
@@ -47,6 +49,7 @@ def test_notify_creates_notification(db):
 
 
 def test_notify_defaults(db):
+    """Verify that notify() applies default event_type and link when not specified."""
     notify(db, "u-tech", "Default test")
     db.commit()
     n = db.query(NotificationDB).filter(NotificationDB.user_id == "u-tech").first()
@@ -55,6 +58,7 @@ def test_notify_defaults(db):
 
 
 def test_notify_supervisors_sends_to_supervisor_and_admin(db):
+    """Verify that notify_supervisors() notifies supervisors and admins but not technicians."""
     notify_supervisors(db, "Supervisor broadcast", event_type="warning")
     db.commit()
     sup_notifs = db.query(NotificationDB).filter(NotificationDB.user_id == "u-sup").all()
@@ -66,6 +70,7 @@ def test_notify_supervisors_sends_to_supervisor_and_admin(db):
 
 
 def test_notify_supervisors_message_content(db):
+    """Verify that notify_supervisors() sets the correct message, event_type, and link on all notifications."""
     notify_supervisors(db, "Critical alert", event_type="critical", link="/issues")
     db.commit()
     notifs = db.query(NotificationDB).all()
@@ -78,6 +83,7 @@ def test_notify_supervisors_message_content(db):
 # ── Issue notifications ────────────────────────────────────────────────────────
 
 def test_issue_high_priority_notifies_supervisors(db):
+    """Verify that creating a high-priority issue triggers a critical supervisor notification."""
     from fastapi.testclient import TestClient
     from app.main import app
     # Patch the DB to use our in-memory one
@@ -101,6 +107,7 @@ def test_issue_high_priority_notifies_supervisors(db):
 
 
 def test_issue_medium_priority_notifies_as_warning(db):
+    """Verify that creating a medium-priority issue triggers a warning supervisor notification."""
     with patch("app.routers.issues.notify_supervisors") as mock_ns:
         from app.routers.issues import create_issue
         from app.schemas.models import IssueCreate
@@ -120,6 +127,7 @@ def test_issue_medium_priority_notifies_as_warning(db):
 
 
 def test_issue_resolution_notifies_reporter(db):
+    """Verify that resolving an issue sends a success notification to the original reporter."""
     with patch("app.routers.issues.notify") as mock_n:
         from app.routers.issues import update_issue_status
         from app.schemas.models import IssueStatusUpdate
@@ -141,6 +149,7 @@ def test_issue_resolution_notifies_reporter(db):
 # ── Action notifications ───────────────────────────────────────────────────────
 
 def test_action_creation_notifies_assignee(db):
+    """Verify that creating an action sends a notification to the assigned user."""
     with patch("app.routers.actions.notify") as mock_n:
         from app.routers.actions import create_action
         from app.schemas.models import ActionCreate
@@ -158,6 +167,7 @@ def test_action_creation_notifies_assignee(db):
 
 
 def test_action_completion_notifies_creator(db):
+    """Verify that completing an action sends a success notification to the action creator."""
     with patch("app.routers.actions.notify") as mock_n:
         from app.routers.actions import update_action_status
         from app.schemas.models import ActionStatusUpdate
@@ -178,6 +188,7 @@ def test_action_completion_notifies_creator(db):
 # ── Inspection completion: score + auto-issues ────────────────────────────────
 
 def test_inspection_critical_score_notifies_supervisors(db):
+    """Verify that an inspection with all failing answers produces a score below the critical threshold."""
     from app.routers.inspections import _calc_score
     # Score below 70 → critical notification
     schema = {"sections": [{"questions": [
@@ -190,6 +201,7 @@ def test_inspection_critical_score_notifies_supervisors(db):
 
 
 def test_inspection_auto_creates_issues_for_flags(db):
+    """Verify that completing an inspection with non-skipped flagged items auto-creates issues."""
     from app.routers.inspections import complete_inspection
     from app.schemas.models import InspectionCompleteRequest, FlaggedItemIn
 
@@ -233,6 +245,7 @@ def test_inspection_auto_creates_issues_for_flags(db):
 
 
 def test_inspection_skipped_flags_do_not_create_issues(db):
+    """Verify that skipped flagged items during inspection completion do not generate issues."""
     from app.routers.inspections import complete_inspection
     from app.schemas.models import InspectionCompleteRequest, FlaggedItemIn
     from app.models.db_models import TemplateDB

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models.db_models import TemplateDB
+from app.repositories import templates_repository as repo
 from app.schemas.models import TemplateCreate, TemplateOut, TemplateUpdate
 from app.services.mappers import to_template_out
 from app.services.store import new_id
@@ -12,13 +12,16 @@ router = APIRouter()
 
 @router.get("", response_model=list[TemplateOut])
 def list_templates(db: Session = Depends(get_db)) -> list[TemplateOut]:
-    records = db.query(TemplateDB).filter(TemplateDB.is_active.is_(True)).order_by(TemplateDB.created_at.desc()).all()
+    """Return all active templates ordered by creation date descending."""
+    records = repo.list_active(db)
     return [to_template_out(item) for item in records]
 
 
 @router.post("", response_model=TemplateOut)
 def create_template(payload: TemplateCreate, db: Session = Depends(get_db)) -> TemplateOut:
-    record = TemplateDB(
+    """Create and persist a new template from the provided payload."""
+    record = repo.create(
+        db,
         id=new_id("tpl"),
         name=payload.name,
         category=payload.category,
@@ -27,15 +30,13 @@ def create_template(payload: TemplateCreate, db: Session = Depends(get_db)) -> T
         created_by="u-admin",
         is_active=True,
     )
-    db.add(record)
-    db.commit()
-    db.refresh(record)
     return to_template_out(record)
 
 
 @router.get("/{template_id}", response_model=TemplateOut)
 def get_template(template_id: str, db: Session = Depends(get_db)) -> TemplateOut:
-    record = db.query(TemplateDB).filter(TemplateDB.id == template_id, TemplateDB.is_active.is_(True)).first()
+    """Retrieve a single active template by its ID."""
+    record = repo.get_active(db, template_id)
     if not record:
         raise HTTPException(status_code=404, detail="Template not found")
     return to_template_out(record)
@@ -43,7 +44,8 @@ def get_template(template_id: str, db: Session = Depends(get_db)) -> TemplateOut
 
 @router.put("/{template_id}", response_model=TemplateOut)
 def update_template(template_id: str, payload: TemplateUpdate, db: Session = Depends(get_db)) -> TemplateOut:
-    record = db.query(TemplateDB).filter(TemplateDB.id == template_id, TemplateDB.is_active.is_(True)).first()
+    """Update the specified fields of an existing active template."""
+    record = repo.get_active(db, template_id)
     if not record:
         raise HTTPException(status_code=404, detail="Template not found")
     if payload.name is not None:
@@ -61,20 +63,23 @@ def update_template(template_id: str, payload: TemplateUpdate, db: Session = Dep
 
 @router.delete("/{template_id}", response_model=dict)
 def archive_template(template_id: str, db: Session = Depends(get_db)) -> dict:
-    record = db.query(TemplateDB).filter(TemplateDB.id == template_id).first()
+    """Soft-delete a template by marking it as inactive."""
+    record = repo.get_by_id(db, template_id)
     if not record:
         raise HTTPException(status_code=404, detail="Template not found")
-    record.is_active = False
+    repo.archive(db, record)
     db.commit()
     return {"ok": True}
 
 
 @router.post("/{template_id}/duplicate", response_model=TemplateOut)
 def duplicate_template(template_id: str, db: Session = Depends(get_db)) -> TemplateOut:
-    original = db.query(TemplateDB).filter(TemplateDB.id == template_id, TemplateDB.is_active.is_(True)).first()
+    """Create a copy of an existing active template with a new ID."""
+    original = repo.get_active(db, template_id)
     if not original:
         raise HTTPException(status_code=404, detail="Template not found")
-    copy = TemplateDB(
+    copy = repo.create(
+        db,
         id=new_id("tpl"),
         name=f"Copy of {original.name}",
         category=original.category,
@@ -83,7 +88,4 @@ def duplicate_template(template_id: str, db: Session = Depends(get_db)) -> Templ
         created_by="u-admin",
         is_active=True,
     )
-    db.add(copy)
-    db.commit()
-    db.refresh(copy)
     return to_template_out(copy)

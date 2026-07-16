@@ -10,6 +10,7 @@ const DEMO_USERS = [
   { role: "Admin",      email: "admin@rigpro.com",       password: "admin123" },
 ];
 
+/** Renders the login page with a branded panel, demo account shortcuts, and a sign-in form. */
 export default function LoginPage({ onLogin }: Props) {
   const [email, setEmail]               = useState("tech@rigpro.com");
   const [password, setPassword]         = useState("tech123");
@@ -17,6 +18,7 @@ export default function LoginPage({ onLogin }: Props) {
   const [loading, setLoading]           = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  /** Validates credentials and submits a login request, storing the returned token on success. */
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");

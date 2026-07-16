@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models.db_models import IssueDB, IssueCommentDB
+from app.repositories import issues_repository as repo
 from app.schemas.models import (
     IssueCommentCreate,
     IssueCommentOut,
@@ -18,7 +18,8 @@ from app.services.store import new_id
 router = APIRouter()
 
 
-def _to_out(row: IssueDB) -> IssueOut:
+def _to_out(row) -> IssueOut:
+    """Convert an IssueDB ORM row to an IssueOut schema object."""
     return IssueOut(
         id=row.id,
         title=row.title,
@@ -48,20 +49,16 @@ def list_issues(
     issue_type: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[IssueOut]:
-    q = db.query(IssueDB)
-    if status:
-        q = q.filter(IssueDB.status == status)
-    if priority:
-        q = q.filter(IssueDB.priority == priority)
-    if issue_type:
-        q = q.filter(IssueDB.issue_type == issue_type)
-    rows = q.order_by(IssueDB.created_at.desc()).all()
+    """Return all issues, optionally filtered by status, priority, or issue type."""
+    rows = repo.list_all(db, status=status, priority=priority, issue_type=issue_type)
     return [_to_out(r) for r in rows]
 
 
 @router.post("", response_model=IssueOut)
 def create_issue(payload: IssueCreate, db: Session = Depends(get_db)) -> IssueOut:
-    row = IssueDB(
+    """Create a new issue and notify supervisors based on its priority."""
+    row = repo.create(
+        db,
         id=new_id("iss"),
         title=payload.title,
         description=payload.description,
@@ -78,8 +75,6 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)) -> IssueOu
         assigned_to=None,
         linked_jsa_id=payload.linked_jsa_id,
     )
-    db.add(row)
-    db.flush()
 
     site_label = f" — {payload.site}" if payload.site else ""
     if payload.priority == "high":
@@ -104,7 +99,8 @@ def create_issue(payload: IssueCreate, db: Session = Depends(get_db)) -> IssueOu
 
 @router.get("/{issue_id}", response_model=IssueOut)
 def get_issue(issue_id: str, db: Session = Depends(get_db)) -> IssueOut:
-    row = db.query(IssueDB).filter(IssueDB.id == issue_id).first()
+    """Retrieve a single issue by its ID."""
+    row = repo.get(db, issue_id)
     if not row:
         raise HTTPException(status_code=404, detail="Issue not found")
     return _to_out(row)
@@ -114,7 +110,8 @@ def get_issue(issue_id: str, db: Session = Depends(get_db)) -> IssueOut:
 def update_issue_status(
     issue_id: str, payload: IssueStatusUpdate, db: Session = Depends(get_db)
 ) -> IssueOut:
-    row = db.query(IssueDB).filter(IssueDB.id == issue_id).first()
+    """Update the status and optional assignee of an issue, sending relevant notifications."""
+    row = repo.get(db, issue_id)
     if not row:
         raise HTTPException(status_code=404, detail="Issue not found")
 
@@ -150,10 +147,11 @@ def update_issue_status(
 
 @router.delete("/{issue_id}", status_code=204)
 def delete_issue(issue_id: str, db: Session = Depends(get_db)) -> None:
-    row = db.query(IssueDB).filter(IssueDB.id == issue_id).first()
+    """Delete an issue by its ID."""
+    row = repo.get(db, issue_id)
     if not row:
         raise HTTPException(status_code=404, detail="Issue not found")
-    db.delete(row)
+    repo.delete(db, row)
     db.commit()
 
 
@@ -161,12 +159,8 @@ def delete_issue(issue_id: str, db: Session = Depends(get_db)) -> None:
 
 @router.get("/{issue_id}/comments", response_model=list[IssueCommentOut])
 def list_comments(issue_id: str, db: Session = Depends(get_db)) -> list[IssueCommentOut]:
-    rows = (
-        db.query(IssueCommentDB)
-        .filter(IssueCommentDB.issue_id == issue_id)
-        .order_by(IssueCommentDB.created_at.asc())
-        .all()
-    )
+    """Return all comments for a given issue in chronological order."""
+    rows = repo.list_comments(db, issue_id)
     return [
         IssueCommentOut(
             id=r.id,
@@ -183,18 +177,17 @@ def list_comments(issue_id: str, db: Session = Depends(get_db)) -> list[IssueCom
 def add_comment(
     issue_id: str, payload: IssueCommentCreate, db: Session = Depends(get_db)
 ) -> IssueCommentOut:
-    issue = db.query(IssueDB).filter(IssueDB.id == issue_id).first()
+    """Add a new comment to an existing issue."""
+    issue = repo.get(db, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
-    comment = IssueCommentDB(
+    comment = repo.add_comment(
+        db,
         id=new_id("ic"),
         issue_id=issue_id,
         user_id=payload.user_id,
         message=payload.message,
     )
-    db.add(comment)
-    db.commit()
-    db.refresh(comment)
     return IssueCommentOut(
         id=comment.id,
         issue_id=comment.issue_id,
@@ -208,7 +201,8 @@ def add_comment(
 
 @router.get("/stats/summary")
 def issues_summary(db: Session = Depends(get_db)) -> dict:
-    all_issues = db.query(IssueDB).all()
+    """Return aggregate counts of issues grouped by status, type, and priority."""
+    all_issues = repo.list_all(db)
     total = len(all_issues)
     by_status = {}
     by_type = {}

@@ -6,6 +6,7 @@ from app.services.summary_service import build_summary, save_summary_files
 
 
 def run(jsa_id: str):
+    """Fetch a JSA record by ID, detect hazards if needed, build a summary, and save the output files."""
     with SessionLocal() as db:
         record = db.query(JsaRecordDB).filter(JsaRecordDB.id == jsa_id).first()
         if not record:

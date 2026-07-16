@@ -2,14 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models.db_models import NotificationDB
+from app.repositories import notifications_repository as repo
 from app.schemas.models import NotificationCreate, NotificationOut
 from app.services.store import new_id
 
 router = APIRouter()
 
 
-def _to_out(row: NotificationDB) -> NotificationOut:
+def _to_out(row) -> NotificationOut:
+    """Convert a NotificationDB row to a NotificationOut schema object."""
     return NotificationOut(
         id=row.id,
         user_id=row.user_id,
@@ -23,14 +24,15 @@ def _to_out(row: NotificationDB) -> NotificationOut:
 
 @router.post("", response_model=NotificationOut)
 def create_notification(payload: NotificationCreate, db: Session = Depends(get_db)) -> NotificationOut:
-    row = NotificationDB(
+    """Create and persist a new notification record."""
+    row = repo.create(
+        db,
         id=new_id("ntf"),
         user_id=payload.user_id,
         message=payload.message,
         event_type=payload.event_type,
         link=payload.link,
     )
-    db.add(row)
     db.commit()
     db.refresh(row)
     return _to_out(row)
@@ -41,29 +43,21 @@ def list_notifications(
     user_id: str = Query(...),
     db: Session = Depends(get_db),
 ) -> list[NotificationOut]:
-    rows = (
-        db.query(NotificationDB)
-        .filter(NotificationDB.user_id == user_id)
-        .order_by(NotificationDB.created_at.desc())
-        .limit(50)
-        .all()
-    )
+    """Return the 50 most recent notifications for the given user."""
+    rows = repo.list_for_user(db, user_id, limit=50)
     return [_to_out(r) for r in rows]
 
 
 @router.get("/unread-count")
 def unread_count(user_id: str = Query(...), db: Session = Depends(get_db)) -> dict:
-    count = (
-        db.query(NotificationDB)
-        .filter(NotificationDB.user_id == user_id, NotificationDB.is_read == False)  # noqa: E712
-        .count()
-    )
-    return {"count": count}
+    """Return the count of unread notifications for the given user."""
+    return {"count": repo.unread_count(db, user_id)}
 
 
 @router.patch("/{notification_id}/read", response_model=NotificationOut)
 def mark_read(notification_id: str, db: Session = Depends(get_db)) -> NotificationOut:
-    row = db.query(NotificationDB).filter(NotificationDB.id == notification_id).first()
+    """Mark a single notification as read and return the updated record."""
+    row = repo.get(db, notification_id)
     if not row:
         raise HTTPException(status_code=404, detail="Notification not found")
     row.is_read = True
@@ -74,18 +68,17 @@ def mark_read(notification_id: str, db: Session = Depends(get_db)) -> Notificati
 
 @router.post("/mark-all-read")
 def mark_all_read(user_id: str = Query(...), db: Session = Depends(get_db)) -> dict:
-    db.query(NotificationDB).filter(
-        NotificationDB.user_id == user_id,
-        NotificationDB.is_read == False,  # noqa: E712
-    ).update({"is_read": True})
+    """Mark all unread notifications for the given user as read."""
+    repo.mark_all_read(db, user_id)
     db.commit()
     return {"ok": True}
 
 
 @router.delete("/{notification_id}", status_code=204)
 def delete_notification(notification_id: str, db: Session = Depends(get_db)) -> None:
-    row = db.query(NotificationDB).filter(NotificationDB.id == notification_id).first()
+    """Delete a notification by its ID."""
+    row = repo.get(db, notification_id)
     if not row:
         raise HTTPException(status_code=404, detail="Notification not found")
-    db.delete(row)
+    repo.delete(db, row)
     db.commit()

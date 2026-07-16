@@ -7,36 +7,6 @@ export type User = {
   role: Role;
 };
 
-export type Hazard = {
-  hazard_id: number;
-  hazard_name: string;
-  controls: string;
-  ppe: string;
-  pre_likelihood: number;
-  pre_severity: number;
-  pre_score: number;
-  post_likelihood: number;
-  post_severity: number;
-  post_score: number;
-};
-
-export type JsaRecord = {
-  id: string;
-  job_number: string;
-  boat_name: string;
-  service_log_number: string;
-  location: string;
-  date: string;
-  status: "draft" | "pending_approval" | "approved";
-  steps: string[];
-  answers: Record<string, boolean>;
-  hazards: Hazard[];
-  ppe_list: string[];
-  created_at: string;
-  supervisor_signature: string | null;
-  approved_by: string | null;
-};
-
 export type FormTemplate = {
   id: string;
   name: string;

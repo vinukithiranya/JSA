@@ -62,6 +62,7 @@ const TYPE_COLORS: Record<string, string> = {
   other: "bg-gray-100 text-gray-600",
 };
 
+/** Formats a date string as a human-readable day/month/year string in en-AU locale. */
 const fmt = (d: string) =>
   new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 
@@ -78,6 +79,7 @@ const EMPTY_STEP3 = {
   immediate_actions: "",
 };
 
+/** Renders the investigations list page with filtering, detail view, and a multi-step new investigation form. */
 export default function InvestigationsPage({ user, onLogout }: Props) {
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [filterStatus, setFilterStatus] = useState("all");
@@ -95,6 +97,7 @@ export default function InvestigationsPage({ user, onLogout }: Props) {
   const [rootCauses, setRootCauses] = useState<RootCause[]>([]);
   const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>([]);
 
+  /** Fetches investigations from the API, applying the current status and severity filters. */
   const load = () => {
     const params = new URLSearchParams();
     if (filterStatus !== "all") params.set("status", filterStatus);
@@ -111,6 +114,7 @@ export default function InvestigationsPage({ user, onLogout }: Props) {
     closed: investigations.filter((i) => i.status === "closed").length,
   };
 
+  /** Resets all multi-step form state back to initial empty values. */
   const resetPanel = () => {
     setStep(1);
     setStep1({ ...EMPTY_STEP1 });
@@ -121,27 +125,39 @@ export default function InvestigationsPage({ user, onLogout }: Props) {
     setError("");
   };
 
+  /** Resets the form and opens the new investigation slide-over panel. */
   const openPanel = () => { resetPanel(); setShowPanel(true); };
+  /** Closes the new investigation slide-over panel and resets form state. */
   const closePanel = () => { setShowPanel(false); resetPanel(); };
 
   // Parties helpers
+  /** Appends a blank involved-party entry to the parties list. */
   const addParty = () => setParties((p) => [...p, { name: "", role: "", statement: "" }]);
+  /** Removes the involved-party entry at the given index. */
   const removeParty = (i: number) => setParties((p) => p.filter((_, idx) => idx !== i));
+  /** Updates a single field on the involved-party entry at the given index. */
   const updateParty = (i: number, field: keyof InvolvedParty, val: string) =>
     setParties((p) => p.map((party, idx) => idx === i ? { ...party, [field]: val } : party));
 
   // Root cause helpers
+  /** Appends a blank root-cause entry to the root causes list. */
   const addRootCause = () => setRootCauses((r) => [...r, { category: "Human", description: "" }]);
+  /** Removes the root-cause entry at the given index. */
   const removeRootCause = (i: number) => setRootCauses((r) => r.filter((_, idx) => idx !== i));
+  /** Updates a single field on the root-cause entry at the given index. */
   const updateRootCause = (i: number, field: keyof RootCause, val: string) =>
     setRootCauses((r) => r.map((rc, idx) => idx === i ? { ...rc, [field]: val } : rc));
 
   // Corrective action helpers
+  /** Appends a blank corrective-action entry to the corrective actions list. */
   const addCA = () => setCorrectiveActions((c) => [...c, { title: "", assigned_to: "", due_date: "", status: "open" }]);
+  /** Removes the corrective-action entry at the given index. */
   const removeCA = (i: number) => setCorrectiveActions((c) => c.filter((_, idx) => idx !== i));
+  /** Updates a single field on the corrective-action entry at the given index. */
   const updateCA = (i: number, field: keyof CorrectiveAction, val: string) =>
     setCorrectiveActions((c) => c.map((ca, idx) => idx === i ? { ...ca, [field]: val } : ca));
 
+  /** Validates the current step and advances the multi-step form to the next step. */
   const handleNext = () => {
     setError("");
     if (step === 1) {
@@ -152,6 +168,7 @@ export default function InvestigationsPage({ user, onLogout }: Props) {
     setStep((s) => s + 1);
   };
 
+  /** Submits the completed investigation form to the API and reloads the investigations list. */
   const handleSubmit = async () => {
     setSaving(true);
     setError("");

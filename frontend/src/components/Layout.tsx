@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { User } from "../types";
 import { notificationsApi, type Notification } from "../api";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { getPendingCount, syncPending } from "../offlineSync";
 
 interface LayoutProps {
   user: User | null;
@@ -50,7 +52,7 @@ const Ico = {
   ),
   Training: () => (
     <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.75} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
     </svg>
   ),
   Box: () => (
@@ -112,7 +114,6 @@ const NAV: NavItem[] = [
   { to: "/actions",     label: "Actions",      Icon: Ico.Check     },
   { to: "/assets",      label: "Assets",       Icon: Ico.Box       },
   { to: "/documents",   label: "Documents",    Icon: Ico.Document  },
-  { to: "/sync",        label: "Offline Sync", Icon: Ico.Sync      },
 ];
 
 const SUP_NAV: NavItem[] = [
@@ -121,6 +122,7 @@ const SUP_NAV: NavItem[] = [
 
 // ── Notification Bell ─────────────────────────────────────────────────────────
 
+/** Renders a notification bell icon with a dropdown panel showing the current user's notifications. */
 function NotificationBell({ user }: { user: User | null }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -142,6 +144,7 @@ function NotificationBell({ user }: { user: User | null }) {
     return () => clearInterval(timer);
   }, [fetchCount]);
 
+  /** Toggles the notification panel open and fetches the notification list when opening. */
   async function openPanel() {
     if (!user) return;
     setOpen(v => !v);
@@ -154,17 +157,20 @@ function NotificationBell({ user }: { user: User | null }) {
     }
   }
 
+  /** Marks a single notification as read by its ID. */
   async function handleMarkRead(id: string) {
     await notificationsApi.markRead(id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
   }
 
+  /** Marks all notifications as read for the current user. */
   async function handleMarkAll() {
     if (!user) return;
     await notificationsApi.markAllRead(user.id);
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
   }
 
+  /** Marks a notification as read and navigates to its link if present. */
   function handleClick(n: Notification) {
     if (!n.is_read) handleMarkRead(n.id);
     if (n.link) { navigate(n.link); setOpen(false); }
@@ -242,7 +248,24 @@ function NotificationBell({ user }: { user: User | null }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+/** Renders the application shell with a collapsible sidebar, top header, notification bell, and main content area. */
 const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
+  const isOnline = useOnlineStatus();
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    getPendingCount().then(setPendingCount).catch(() => null);
+  }, [isOnline]);
+
+  async function handleManualSync() {
+    setSyncing(true);
+    await syncPending().catch(() => null);
+    const count = await getPendingCount().catch(() => 0);
+    setPendingCount(count);
+    setSyncing(false);
+  }
+
   const loc = useLocation();
   const isSup = user?.role === "supervisor" || user?.role === "admin";
   const links = isSup ? [...NAV, ...SUP_NAV] : NAV;
@@ -252,6 +275,7 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
     return typeof window !== "undefined" && window.innerWidth >= 768;
   });
 
+  /** Toggles the sidebar open/closed state and persists the preference to localStorage. */
   function toggleSidebar(open: boolean) {
     setSidebarOpen(open);
     localStorage.setItem("sidebarOpen", String(open));
@@ -369,8 +393,39 @@ const Layout: React.FC<LayoutProps> = ({ user, title, onLogout, children }) => {
             )}
             <h1 className="font-display text-base font-semibold text-brand-900">{title}</h1>
           </div>
-          <NotificationBell user={user} />
+          <div className="flex items-center gap-2">
+            {isOnline && pendingCount > 0 && (
+              <button
+                onClick={handleManualSync}
+                disabled={syncing}
+                className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-60"
+              >
+                <svg className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {syncing ? "Syncing…" : `${pendingCount} pending`}
+              </button>
+            )}
+            {!isOnline && (
+              <span className="flex items-center gap-1 rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                Offline
+              </span>
+            )}
+            <NotificationBell user={user} />
+          </div>
         </header>
+        {!isOnline && (
+          <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2">
+            <svg className="h-4 w-4 shrink-0 text-amber-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728M15.536 8.464a5 5 0 010 7.072M12 12h.01M8.464 15.536a5 5 0 010-7.072M5.636 18.364a9 9 0 010-12.728" />
+            </svg>
+            <p className="text-xs font-medium text-amber-800">
+              You're offline — data saves locally and syncs automatically when reconnected
+              {pendingCount > 0 && <span className="ml-1 font-bold">({pendingCount} item{pendingCount !== 1 ? "s" : ""} pending)</span>}
+            </p>
+          </div>
+        )}
         <main className="flex-1 overflow-auto px-4 py-4 sm:px-6 sm:py-5">{children}</main>
       </div>
     </div>

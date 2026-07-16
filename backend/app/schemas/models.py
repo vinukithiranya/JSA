@@ -5,11 +5,15 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
+    """Schema for user login credentials."""
+
     email: EmailStr
     password: str = Field(min_length=6)
 
 
 class UserOut(BaseModel):
+    """Schema for returning user data in responses."""
+
     id: str
     email: EmailStr
     full_name: str
@@ -17,11 +21,15 @@ class UserOut(BaseModel):
 
 
 class LoginResponse(BaseModel):
+    """Schema for the login response containing token and user info."""
+
     token: str
     user: UserOut
 
 
 class TemplateCreate(BaseModel):
+    """Schema for creating a new JSA template."""
+
     name: str
     category: str = "JSA"
     description: str = ""
@@ -29,6 +37,8 @@ class TemplateCreate(BaseModel):
 
 
 class TemplateOut(BaseModel):
+    """Schema for returning template data in responses."""
+
     id: str
     name: str
     category: str
@@ -37,71 +47,17 @@ class TemplateOut(BaseModel):
 
 
 class TemplateUpdate(BaseModel):
+    """Schema for partially updating an existing template."""
+
     name: Optional[str] = None
     category: Optional[str] = None
     description: Optional[str] = None
     form_schema: Optional[dict] = None
 
 
-class JsaDraftCreate(BaseModel):
-    job_number: str
-    boat_name: str
-    service_log_number: str
-    location: str
-    date: date
-
-
-class JsaStepsUpdate(BaseModel):
-    steps: list[str]
-
-
-class JsaQuestionnaireUpdate(BaseModel):
-    answers: dict[str, bool]
-
-
-class HazardOut(BaseModel):
-    hazard_id: int
-    hazard_name: str
-    controls: str
-    ppe: str
-    pre_likelihood: int
-    pre_severity: int
-    pre_score: int
-    post_likelihood: int
-    post_severity: int
-    post_score: int
-
-
-class AnalyzeResponse(BaseModel):
-    hazards: list[HazardOut]
-    ppe_list: list[str]
-
-
-class JsaRecord(BaseModel):
-    id: str
-    job_number: str
-    boat_name: str
-    service_log_number: str
-    location: str
-    date: date
-    status: Literal["draft", "pending_approval", "approved"]
-    steps: list[str]
-    answers: dict[str, bool]
-    hazards: list[HazardOut]
-    ppe_list: list[str]
-    created_at: datetime
-    summary_json_url: str | None = None
-    summary_csv_url: str | None = None
-    supervisor_signature: str | None = None
-    approved_by: str | None = None
-
-
-class ApproveRequest(BaseModel):
-    signature: str
-    supervisor_name: str = ""
-
-
 class DocumentOut(BaseModel):
+    """Schema for returning document metadata in responses."""
+
     id: str
     filename: str
     original_filename: str
@@ -113,27 +69,16 @@ class DocumentOut(BaseModel):
     uploaded_by: str
 
 
-class SyncBatchItem(BaseModel):
-    job_number: str
-    boat_name: str
-    service_log_number: str
-    location: str
-    date: date
-    steps: list[str] = Field(default_factory=list)
-    answers: dict[str, bool] = Field(default_factory=dict)
-
-
-class SyncBatchRequest(BaseModel):
-    created_by: str = "u-tech"
-    items: list[SyncBatchItem]
-
-
 class TeamCreate(BaseModel):
+    """Schema for creating a new team with an assigned supervisor."""
+
     name: str
     supervisor_id: str
 
 
 class TeamOut(BaseModel):
+    """Schema for returning team data in responses."""
+
     id: str
     name: str
     supervisor_id: str
@@ -141,12 +86,16 @@ class TeamOut(BaseModel):
 
 
 class TeamMemberCreate(BaseModel):
+    """Schema for adding a member to a team with a specified role."""
+
     team_id: str
     user_id: str
     role: Literal["technician", "supervisor"]
 
 
 class TeamMemberOut(BaseModel):
+    """Schema for returning team membership data in responses."""
+
     id: str
     team_id: str
     user_id: str
@@ -157,6 +106,8 @@ class TeamMemberOut(BaseModel):
 # ─── Enhanced Actions ────────────────────────────────────────────────────────
 
 class ActionCreate(BaseModel):
+    """Schema for creating a new corrective or preventive action."""
+
     title: str
     description: Optional[str] = None
     assigned_to: str
@@ -170,10 +121,14 @@ class ActionCreate(BaseModel):
 
 
 class ActionStatusUpdate(BaseModel):
+    """Schema for updating the status of an action."""
+
     status: str
 
 
 class ActionOut(BaseModel):
+    """Schema for returning action data in responses."""
+
     id: str
     title: str
     description: Optional[str]
@@ -191,11 +146,15 @@ class ActionOut(BaseModel):
 
 
 class ActionCommentCreate(BaseModel):
+    """Schema for adding a comment to an action."""
+
     user_id: str
     message: str
 
 
 class ActionCommentOut(BaseModel):
+    """Schema for returning action comment data in responses."""
+
     id: str
     action_id: str
     user_id: str
@@ -206,6 +165,8 @@ class ActionCommentOut(BaseModel):
 # ─── Issues ──────────────────────────────────────────────────────────────────
 
 class IssueCreate(BaseModel):
+    """Schema for reporting a new safety issue or hazard."""
+
     title: str
     description: str = ""
     issue_type: Literal["hazard", "near_miss", "observation", "incident", "positive", "maintenance"] = "hazard"
@@ -220,11 +181,15 @@ class IssueCreate(BaseModel):
 
 
 class IssueStatusUpdate(BaseModel):
+    """Schema for updating the status and assignment of an issue."""
+
     status: Literal["open", "in_progress", "resolved"]
     assigned_to: Optional[str] = None
 
 
 class IssueOut(BaseModel):
+    """Schema for returning issue data in responses."""
+
     id: str
     title: str
     description: str
@@ -246,11 +211,15 @@ class IssueOut(BaseModel):
 
 
 class IssueCommentCreate(BaseModel):
+    """Schema for adding a comment to an issue."""
+
     user_id: str
     message: str
 
 
 class IssueCommentOut(BaseModel):
+    """Schema for returning issue comment data in responses."""
+
     id: str
     issue_id: str
     user_id: str
@@ -261,6 +230,8 @@ class IssueCommentOut(BaseModel):
 # ─── Scheduling ──────────────────────────────────────────────────────────────
 
 class ScheduleCreate(BaseModel):
+    """Schema for creating a recurring inspection schedule."""
+
     title: str
     template_id: str
     template_name: str = ""
@@ -274,6 +245,8 @@ class ScheduleCreate(BaseModel):
 
 
 class ScheduleOut(BaseModel):
+    """Schema for returning schedule data in responses."""
+
     id: str
     title: str
     template_id: str
@@ -290,6 +263,8 @@ class ScheduleOut(BaseModel):
 
 
 class OccurrenceOut(BaseModel):
+    """Schema for returning a scheduled occurrence instance in responses."""
+
     id: str
     schedule_id: str
     schedule_title: str
@@ -302,6 +277,8 @@ class OccurrenceOut(BaseModel):
 
 
 class OccurrenceComplete(BaseModel):
+    """Schema for marking a schedule occurrence as completed."""
+
     completed_by: str
     jsa_id: Optional[str] = None
 
@@ -309,6 +286,8 @@ class OccurrenceComplete(BaseModel):
 # ─── Inspections ─────────────────────────────────────────────────────────────
 
 class InspectionStart(BaseModel):
+    """Schema for initiating a new inspection session."""
+
     template_id: str
     title: str = ""
     site: str = ""
@@ -316,6 +295,8 @@ class InspectionStart(BaseModel):
 
 
 class AnswerPayload(BaseModel):
+    """Schema for a single inspection question answer with optional media and flags."""
+
     value: Optional[str | float | bool | list] = None
     note: str = ""
     is_flagged: bool = False
@@ -323,10 +304,14 @@ class AnswerPayload(BaseModel):
 
 
 class InspectionAnswersUpdate(BaseModel):
+    """Schema for submitting a batch of answers for an inspection."""
+
     answers: dict[str, AnswerPayload]
 
 
 class FlaggedItemIn(BaseModel):
+    """Schema for a flagged inspection item requiring follow-up."""
+
     question_id: str
     question_text: str
     answer_value: str
@@ -336,15 +321,21 @@ class FlaggedItemIn(BaseModel):
 
 
 class InspectionCompleteRequest(BaseModel):
+    """Schema for completing an inspection with a list of flagged items."""
+
     flagged_items: list[FlaggedItemIn] = Field(default_factory=list)
 
 
 class InspectionApproveRequest(BaseModel):
+    """Schema for approving a completed inspection with an optional signature."""
+
     approved_by: str
     signature: Optional[str] = None
 
 
 class InspectionOut(BaseModel):
+    """Schema for returning full inspection data in responses."""
+
     id: str
     template_id: str
     template_name: str
@@ -367,6 +358,8 @@ class InspectionOut(BaseModel):
 # ─── Notifications ───────────────────────────────────────────────────────────
 
 class NotificationCreate(BaseModel):
+    """Schema for creating a new user notification."""
+
     user_id: str
     message: str
     event_type: str = "info"
@@ -374,6 +367,8 @@ class NotificationCreate(BaseModel):
 
 
 class NotificationOut(BaseModel):
+    """Schema for returning notification data in responses."""
+
     id: str
     user_id: str
     message: str
@@ -386,6 +381,8 @@ class NotificationOut(BaseModel):
 # ─── Audit Logs ──────────────────────────────────────────────────────────────
 
 class AuditLogCreate(BaseModel):
+    """Schema for recording a new audit log entry."""
+
     user_id: str
     action: str
     resource: str
@@ -393,6 +390,8 @@ class AuditLogCreate(BaseModel):
 
 
 class AuditLogOut(BaseModel):
+    """Schema for returning audit log data in responses."""
+
     id: str
     user_id: str
     action: str

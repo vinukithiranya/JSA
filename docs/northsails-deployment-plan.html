@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RigPro → Northsails Deployment Plan</title>
+<style>
+  :root {
+    --bg-primary: #0f1420;
+    --bg-secondary: #161c2c;
+    --border: #2a3348;
+    --border-light: #33405c;
+    --text-primary: #e8ecf4;
+    --text-secondary: #b4bdd1;
+    --text-muted: #7c88a3;
+    --accent-blue: #60a5fa;
+    --accent-purple: #c084fc;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-green-bg: rgba(74,222,128,0.1);
+    --accent-amber-bg: rgba(251,191,36,0.1);
+    --accent-red-bg: rgba(248,113,113,0.1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .doc-container { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+  .doc-header { margin-bottom: 36px; }
+  h1 { color: var(--text-primary); font-size: 26px; margin: 8px 0 10px; }
+  h2 {
+    color: var(--text-primary);
+    font-size: 19px;
+    margin: 40px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { color: var(--text-primary); font-size: 15px; margin: 22px 0 8px; }
+  p { margin: 8px 0; }
+  code {
+    background: rgba(148,163,184,0.12);
+    color: var(--accent-blue);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: "SF Mono", Consolas, Menlo, monospace;
+  }
+  a { color: var(--accent-blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  strong { color: var(--text-primary); }
+
+  .meta { margin-top: 10px; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-right: 8px;
+  }
+  .tag-date { background: rgba(96,165,250,0.12); color: var(--accent-blue); }
+  .tag-current { background: var(--accent-amber-bg); color: var(--accent-amber); }
+
+  .now-list { list-style: none; padding-left: 0; margin: 8px 0 22px; }
+  .now-list li {
+    position: relative;
+    padding: 8px 12px 8px 34px;
+    margin: 4px 0;
+    border-radius: 6px;
+    font-size: 13.5px;
+  }
+  .now-list li:hover { background: rgba(148,163,184,0.06); }
+  .now-list.done li::before {
+    content: '✓';
+    position: absolute;
+    left: 10px;
+    top: 7px;
+    color: var(--accent-green);
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .now-list.todo li::before {
+    content: '○';
+    position: absolute;
+    left: 10px;
+    top: 7px;
+    color: var(--accent-amber);
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .now-group { margin: 18px 0 8px; }
+  .now-group-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .defer-box {
+    border: 1px dashed var(--border-light);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 18px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .defer-box strong { color: var(--text-secondary); }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+
+  ol, ul { padding-left: 22px; margin: 10px 0; }
+  li { margin: 5px 0; }
+
+  ul.checklist { list-style: none; padding-left: 0; }
+  ul.checklist li {
+    position: relative;
+    padding-left: 28px;
+  }
+  ul.checklist li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 3px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-light);
+    border-radius: 4px;
+  }
+
+  .card {
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 14px 0;
+    background: var(--bg-secondary);
+  }
+  .card-red { border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.05); }
+  .card-red h3 { color: var(--accent-red); }
+  .card-amber { border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.05); }
+  .card-amber h3 { color: var(--accent-amber); }
+  .card-blue { border-color: rgba(96,165,250,0.35); background: rgba(96,165,250,0.05); }
+  .card-blue h3 { color: var(--accent-blue); }
+  .card-purple { border-color: rgba(192,132,252,0.35); background: rgba(192,132,252,0.05); }
+  .card-purple h3 { color: var(--accent-purple); }
+  .card h3 { margin-top: 0; }
+  .card ol, .card ul { margin: 6px 0; }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .badge-blocking { background: var(--accent-red-bg); color: var(--accent-red); border: 1px solid rgba(248,113,113,0.3); }
+  .badge-amber { background: var(--accent-amber-bg); color: var(--accent-amber); border: 1px solid rgba(251,191,36,0.3); }
+  .badge-blue { background: rgba(96,165,250,0.1); color: var(--accent-blue); border: 1px solid rgba(96,165,250,0.3); }
+
+  .workflow-timeline { position: relative; padding-left: 34px; margin: 22px 0; }
+  .workflow-timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    background: var(--border);
+  }
+  .wf-step { position: relative; margin-bottom: 24px; }
+  .wf-step:last-child { margin-bottom: 0; }
+  .wf-step::before {
+    content: attr(data-n);
+    position: absolute;
+    left: -34px;
+    top: 0;
+    width: 24px;
+    height: 24px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .wf-step.wf-blocking::before { border-color: rgba(248,113,113,0.5); background: var(--accent-red-bg); color: var(--accent-red); }
+  .wf-step .wf-title { font-size: 14.5px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+  .wf-step .wf-detail { font-size: 13px; color: var(--text-muted); margin: 0; }
+  .wf-step .wf-detail ul { margin: 6px 0 0; padding-left: 18px; }
+
+  .decision {
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 10px 0;
+    background: var(--bg-secondary);
+  }
+  .decision .q { color: var(--text-primary); font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+
+  pre {
+    background: rgba(148,163,184,0.08);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    margin: 8px 0 14px;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; color: var(--text-secondary); font-size: 12.5px; }
+
+  .problem-item { margin-bottom: 26px; padding-bottom: 4px; }
+  .problem-item:last-child { margin-bottom: 4px; }
+  .problem-item + .problem-item { border-top: 1px solid var(--border); padding-top: 18px; }
+  .problem-title { color: var(--text-primary); font-weight: 600; font-size: 14.5px; margin-bottom: 4px; }
+  .problem-desc { font-size: 13.5px; color: var(--text-muted); margin: 0 0 8px; }
+  .fix-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--accent-green);
+    margin: 10px 0 4px;
+  }
+  .fix-steps { margin: 4px 0 0; }
+  .fix-steps > li { margin: 7px 0; font-size: 13.5px; }
+  .fix-note {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin: 6px 0 0;
+    padding-left: 10px;
+    border-left: 2px solid var(--border-light);
+  }
+
+  .doc-footer {
+    margin-top: 60px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg-primary: #f7f8fb;
+      --bg-secondary: #ffffff;
+      --border: #e2e6ee;
+      --border-light: #d7dce6;
+      --text-primary: #1a2033;
+      --text-secondary: #3d4560;
+      --text-muted: #7a8299;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="doc-container">
+
+  <div class="doc-header">
+    <h1>RigPro → Northsails CI/CD &amp; Engineering Standards — Deployment Plan</h1>
+    <div class="meta">
+      <span class="tag tag-date">July 2026</span>
+      <span class="tag tag-current">In progress — fully-fixed items removed below</span>
+    </div>
+    <p style="margin-top:14px;">
+      Target standard is defined by <code>cicd-architecture.html</code> (North Intelligence CI/CD) and
+      <code>development-guide.html</code> (North Intelligence dev guide). This document maps RigPro's
+      <strong>current state</strong> against that standard. Fully-resolved items have been removed from
+      the gap list — this tracks only what's <strong>partially done or not started yet</strong>.
+    </p>
+  </div>
+
+  <!-- ═══════════════════════════ ALREADY RESOLVED ═══════════════════════════ -->
+  <section>
+    <h2>0. Already Resolved (context only — not part of the remaining plan)</h2>
+    <ul class="now-list done">
+      <li>Passwords are hashed with bcrypt (<code>passlib</code>) instead of compared as plaintext</li>
+      <li>CORS is locked to a configured origin list instead of <code>allow_origins=["*"]</code></li>
+      <li><code>GET /api/health</code> added with a real DB ping</li>
+      <li><code>frontend/package.json</code> has a <code>build:deploy</code> script</li>
+      <li>Environment-driven configuration (<code>backend/app/core/config.py</code> + <code>.env.example</code>) replaces scattered <code>os.getenv</code> calls</li>
+      <li>A GitHub Actions workflow (<code>.github/workflows/ci.yml</code>) runs backend tests + frontend build on every push/PR to <code>main</code>/<code>dev</code></li>
+      <li>Design-first doc templates exist at <code>docs/requirements/TEMPLATE.md</code> and <code>docs/design/TEMPLATE.md</code></li>
+      <li>A <code>repositories/</code> layer now exists (<code>backend/app/repositories/</code>) covering all 17 domains — SQL is out of <code>services/*.py</code> and routers, verified with a full smoke test plus the existing suite (22/22 passing). Also fixed a pre-existing bug found along the way: <code>create_audit_log</code> never generated an <code>id</code>, so that endpoint was broken before this change.</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════ CURRENT STATE ═══════════════════════════ -->
+  <section>
+    <h2>1. Current State Summary (remaining issues only)</h2>
+    <table>
+      <thead><tr><th>Area</th><th>Current State</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Source control</strong></td><td>GitHub, 3 different remotes (<code>origin</code> → RigPro-JSA-, <code>backend</code> → JSA-backend, <code>github</code> → JSA). The PAT has been stripped from the <code>github</code> remote URL locally, but the token itself is not yet revoked on GitHub</td></tr>
+        <tr><td><strong>Branches</strong></td><td>A local <code>dev</code> branch now exists (not pushed). Stray branches (<code>deploy3</code>, <code>fix-404</code>, <code>gh-pages-deploy2</code>, <code>gh-pages-local</code>, worktree branches) are still present — no PR-gated flow or branch protection yet</td></tr>
+        <tr><td><strong>CI/CD</strong></td><td>A GitHub Actions workflow runs build+test only. No deploy pipeline exists — deployment is still manual (<code>docker build && docker push</code> then <code>az webapp</code>, or Railway)</td></tr>
+        <tr><td><strong>Environments</strong></td><td>Single environment only (<code>rigpro-rg</code> / <code>rigpro-app</code>) — no DEV/PROD split</td></tr>
+        <tr><td><strong>DB schema management</strong></td><td><code>Base.metadata.create_all()</code> + a hand-rolled <code>_run_migration()</code> in <code>main.py</code> running raw <code>ALTER TABLE</code> statements on every startup inside a bare <code>try/except: pass</code></td></tr>
+        <tr><td><strong>Auth</strong></td><td>Login issues a real JWT and <code>GET /api/auth/me</code> verifies it end-to-end, but no other router requires a token yet — every other endpoint still accepts unauthenticated requests</td></tr>
+        <tr><td><strong>Access control</strong></td><td><code>rbac.check_permission</code> exists but is only invoked ad hoc, keyed off a raw <code>user_id</code> the caller supplies rather than the authenticated user</td></tr>
+        <tr><td><strong>Layering</strong></td><td>Flat <code>app/services/*.py</code>, no <code>repositories/</code> layer, no per-domain folders</td></tr>
+        <tr><td><strong>DB model conventions</strong></td><td>String PKs (e.g. <code>u-...</code>), inconsistent <code>created_by</code>/<code>updated_by</code>, no <code>company_id</code> (single-tenant)</td></tr>
+        <tr><td><strong>Secrets</strong></td><td><code>AZURE_DEPLOYMENT_GUIDE.md</code>'s example password has been replaced with a placeholder, but it's not yet confirmed whether that string was ever a real live password</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════ TARGET STANDARD ═══════════════════════════ -->
+  <section>
+    <h2>2. Target Standard</h2>
+    <ul>
+      <li><strong>Azure DevOps</strong> repo, <code>dev</code> → <code>main</code> branch flow, PR-gated both ways.</li>
+      <li><code>azure-pipelines.yml</code> at repo root: <strong>Build &amp; Package</strong> (Node 20, <code>npm ci</code>, <code>npm run build:deploy</code>, copy build → <code>backend/static</code>, zip <code>backend/</code>) → <strong>Deploy DEV</strong> (auto, Python 3.12, <code>alembic upgrade head</code>, ZIP Deploy, health check) → <strong>Deploy PROD</strong> (manual approval gate, same steps against prod resources).</li>
+      <li>Two fully separate resource groups / App Services / Postgres servers (DEV: B1 + Burstable B1ms, PROD: P1v2 + General Purpose D2s).</li>
+      <li>Secrets live in an Azure DevOps <strong>variable group</strong>, marked secret — never in YAML or docs.</li>
+      <li>Schema changes go through <strong>Alembic</strong> migration files, applied by the pipeline — not by app startup code.</li>
+      <li>Every endpoint behind <code>get_current_user</code>/<code>get_user_email</code>; new services check <code>check_service_access</code>.</li>
+      <li>Layered code: Routes (thin) → Repositories (SQL only) → Services (business logic only) → Models (Pydantic validation).</li>
+      <li>DB rules: UUID PKs, <code>TIMESTAMPTZ</code>, <code>created_at</code>/<code>updated_at</code> everywhere, <code>created_by</code>/<code>updated_by</code> on user-editable tables, idempotent migrations, <code>company_id</code> FK on new tables unless documented otherwise.</li>
+      <li>Requirements doc → design doc → implement → verify, for anything beyond a small (&lt;3 file) change.</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════ GAP LIST ═══════════════════════════ -->
+  <section>
+    <h2>3. Outstanding Gaps — With Full Fix Steps</h2>
+
+    <!-- 3.1 -->
+    <div class="card card-red">
+      <span class="badge badge-blocking">SECURITY — PARTIALLY FIXED</span>
+      <h3>3.1 Security items still open</h3>
+
+      <div class="problem-item" id="fix-real-auth">
+        <div class="problem-title">1. Authentication not enforced on routes <span class="badge badge-amber">PARTIALLY FIXED</span></div>
+        <p class="problem-desc">Login used to return a fake <code>demo-token-&#123;id&#125;</code> string that was never validated again.</p>
+        <p class="fix-note"><strong>Done:</strong> <code>core/security.py</code> issues/decodes real JWTs, <code>core/deps.py</code> has a working <code>get_current_user</code>, <code>POST /api/auth/login</code> returns a real JWT, and <code>GET /api/auth/me</code> proves the flow end-to-end (verified: valid token → 200, no token → 401, wrong password → 401). Frontend needed no changes — <code>api.ts</code> already sends whatever token is stored as a Bearer header. <strong>Not done yet:</strong> the other 17 routers still accept unauthenticated requests — <code>get_current_user</code> is not yet wired into them.</p>
+        <div class="fix-label">Remaining steps</div>
+        <ol class="fix-steps">
+          <li>Go through every router (<code>actions</code>, <code>analytics</code>, <code>assets</code>, <code>audit</code>, <code>contractors</code>, <code>credentials</code>, <code>dashboard</code>, <code>documents</code>, <code>headsup</code>, <code>inspections</code>, <code>investigations</code>, <code>issues</code>, <code>notifications</code>, <code>scheduling</code>, <code>sync</code>, <code>teams</code>, <code>templates</code>) and add <code>current_user: UserDB = Depends(get_current_user)</code>.</li>
+          <li>Per endpoint, decide which client-supplied identity fields (e.g. <code>created_by</code>, <code>reported_by</code>, <code>conducted_by</code>) should instead be derived from <code>current_user.id</code> to stop clients from spoofing them — this is a judgment call per field, not mechanical.</li>
+          <li>Update <code>rbac.check_permission</code>/<code>team_based_visibility</code> call sites to take the resolved <code>current_user</code> rather than a client-supplied id.</li>
+          <li>Update <code>frontend/src/api.ts</code> to handle 401 responses by redirecting to login.</li>
+        </ol>
+      </div>
+
+      <div class="problem-item" id="fix-leaked-pat">
+        <div class="problem-title">2. Credential exposed in a git remote URL <span class="badge badge-amber">PARTIALLY FIXED</span></div>
+        <p class="problem-desc">The <code>github</code> remote was configured as <code>https://ghp_...@github.com/jayaminivajira0-ship-it/JSA.git</code> — a live personal access token sitting in plain text in <code>.git/config</code>.</p>
+        <p class="fix-note"><strong>Done:</strong> stripped from the local remote (<code>git remote set-url github https://github.com/jayaminivajira0-ship-it/JSA.git</code>). Confirmed the token was never committed to tracked history (<code>git log --all -p | grep -c "ghp_..."</code> returned 0), so no history rewrite is needed.</p>
+        <div class="fix-label">Remaining steps</div>
+        <ol class="fix-steps">
+          <li><strong>Needs manual action on GitHub, not something that can be done from this repo:</strong> revoke the token at GitHub → Settings → Developer settings → Personal access tokens → delete the token beginning <code>ghp_WqNwOPZ...</code>. The remote points at <code>jayaminivajira0-ship-it/JSA.git</code>, not the current user's own account — whoever owns that account needs to revoke it.</li>
+          <li>If push access to that remote is still needed afterward, generate a new fine-scoped PAT and store it in a credential manager (e.g. Git Credential Manager) — never embed it in the remote URL again.</li>
+        </ol>
+      </div>
+
+      <div class="problem-item" id="fix-plaintext-secret">
+        <div class="problem-title">3. Example password in deployment doc <span class="badge badge-amber">PARTIALLY FIXED</span></div>
+        <p class="problem-desc"><code>AZURE_DEPLOYMENT_GUIDE.md</code> included an inline example database password (<code>MySecurePassword123!</code>) directly in the repo.</p>
+        <p class="fix-note"><strong>Done:</strong> all 4 occurrences replaced with the placeholder <code>&lt;YOUR_SECURE_PASSWORD&gt;</code>.</p>
+        <div class="fix-label">Remaining steps</div>
+        <ol class="fix-steps">
+          <li><strong>Needs confirmation from you:</strong> was <code>MySecurePassword123!</code> ever actually used as a real admin password on a deployed PostgreSQL server? If so, rotate it: <code>az postgres flexible-server update --resource-group rigpro-rg --name rigpro-db-server --admin-password &lt;new-password&gt;</code>.</li>
+          <li>Add a pre-commit secret scanner (e.g. <code>gitleaks</code> or <code>detect-secrets</code>) so real-looking secrets can't be committed again.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- 3.2 -->
+    <div class="card card-amber">
+      <span class="badge badge-blocking" style="background:var(--accent-red-bg);color:var(--accent-red);border-color:rgba(248,113,113,0.3);">NOT STARTED</span>
+      <h3>3.2 Schema migrations</h3>
+      <div class="problem-item" id="fix-alembic" style="margin-bottom:0;border-top:none;padding-top:0;">
+        <p class="problem-desc">Schema is still created via <code>Base.metadata.create_all()</code> plus a hand-rolled <code>_run_migration()</code> in <code>main.py</code> that runs raw <code>ALTER TABLE</code> statements on every app startup inside a bare <code>try/except: pass</code> — real errors are silently swallowed and there is no versioned history of schema changes.</p>
+        <div class="fix-label">Fix — step by step</div>
+        <ol class="fix-steps">
+          <li>Add Alembic: <code>pip install alembic==1.13.*</code>, add to <code>requirements.txt</code>.</li>
+          <li>From <code>backend/</code>: <code>alembic init alembic</code>.</li>
+          <li>In <code>alembic.ini</code>, delete the hardcoded <code>sqlalchemy.url</code> line.</li>
+          <li>In <code>alembic/env.py</code>, point Alembic at the app's models and env-configured URL:
+            <pre><code>from app.core.config import get_settings
+from app.core.db import Base
+from app.models import db_models  # noqa: F401
+
+config.set_main_option("sqlalchemy.url", get_settings().database_url)
+target_metadata = Base.metadata</code></pre>
+          </li>
+          <li>Generate the baseline revision and review it against the current schema:
+            <pre><code>alembic revision --autogenerate -m "baseline_current_schema"</code></pre>
+          </li>
+          <li>For every environment that already has a live database, mark it as already at baseline <em>without</em> re-running the DDL: <code>alembic stamp baseline_current_schema</code> (do not run <code>upgrade</code> for this first revision against existing data).</li>
+          <li>Convert each of the existing <code>_run_migration()</code> calls into its own versioned migration, guarded for idempotency, e.g.:
+            <pre><code>def upgrade():
+    op.execute("ALTER TABLE actions ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'medium'")
+
+def downgrade():
+    op.execute("ALTER TABLE actions DROP COLUMN IF EXISTS priority")</code></pre>
+            Repeat for <code>due_date</code>, <code>labels</code>, <code>action_type</code>, <code>linked_issue_id</code>, <code>linked_jsa_id</code>, <code>created_by</code> on <code>actions</code>; <code>event_type</code>, <code>link</code> on <code>notifications</code>; and <code>supervisor_signature</code> on <code>inspection_records</code>.
+          </li>
+          <li>Delete the <code>_run_migration()</code> function and every call site from <code>main.py</code>'s <code>lifespan</code>. Keep <code>Base.metadata.create_all(bind=engine)</code> only for a throwaway local sqlite dev DB, or remove it entirely once Alembic fully owns schema creation.</li>
+          <li>Test against a fresh empty database: <code>alembic upgrade head</code> should build the entire schema from nothing; run the backend test suite against it.</li>
+          <li>Add <code>alembic upgrade head</code> as an explicit deploy step (pipeline task, run before the app starts) rather than something the app does at boot.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- 3.3 -->
+    <div class="card card-blue">
+      <span class="badge badge-blue">NOT STARTED — BLOCKED ON OPEN DECISIONS 1 &amp; 2</span>
+      <h3>3.3 Azure DevOps CI/CD &amp; environments</h3>
+      <p class="problem-desc">A GitHub Actions workflow (<code>.github/workflows/ci.yml</code>) now covers build+test, but nothing below — actual deployment automation — exists yet.</p>
+
+      <div class="problem-item">
+        <div class="problem-title">1. Repo consolidation</div>
+        <div class="fix-label">Fix — step by step</div>
+        <ol class="fix-steps">
+          <li>Decide Azure DevOps vs. GitHub + Azure Pipelines (Open Decision 2, below).</li>
+          <li>If moving to Azure DevOps: create the project at <code>northsails.visualstudio.com</code>, then mirror the repo:
+            <pre><code>git remote add ado https://northsails.visualstudio.com/&lt;project&gt;/_git/RigPro
+git push ado --all
+git push ado --tags</code></pre>
+          </li>
+          <li>Standardize on a single remaining remote and update any docs/scripts that reference the old ones.</li>
+        </ol>
+      </div>
+
+      <div class="problem-item" id="fix-branch-hygiene">
+        <div class="problem-title">2. Branch flow &amp; hygiene <span class="badge badge-amber">PARTIALLY FIXED</span></div>
+        <p class="fix-note"><strong>Done:</strong> local <code>dev</code> branch created from <code>main</code> (not pushed, not switched to).</p>
+        <div class="fix-label">Remaining steps</div>
+        <ol class="fix-steps">
+          <li>Push it: <code>git push -u origin dev</code>.</li>
+          <li>Set branch policies on both <code>dev</code> and <code>main</code>: require a PR with at least one reviewer, require a successful build, block direct pushes.</li>
+          <li>Delete stray branches once merged or confirmed unneeded: <code>git push origin --delete deploy3 fix-404 gh-pages-deploy2 gh-pages-local</code>.</li>
+          <li>Remove unused worktrees: <code>git worktree remove &lt;path&gt;</code> for each leftover <code>worktree-agent-*</code> branch/worktree.</li>
+        </ol>
+      </div>
+
+      <div class="problem-item">
+        <div class="problem-title">3. Pipeline definition</div>
+        <div class="fix-label">Fix — step by step</div>
+        <ol class="fix-steps">
+          <li>Commit <code>azure-pipelines.yml</code> at the repo root (adjust task inputs once Open Decision 1 — container vs. ZIP deploy — is settled; the example below assumes ZIP deploy to match the reference architecture):
+            <pre><code>trigger:
+  branches:
+    include: [dev, main]
+pr: none
+
+stages:
+- stage: Build
+  displayName: 'Build &amp; Package'
+  jobs:
+  - job: BuildJob
+    pool: { vmImage: 'ubuntu-latest' }
+    steps:
+    - task: NodeTool@0
+      inputs: { versionSpec: '20.x' }
+    - script: |
+        cd frontend
+        npm ci
+        npm run build:deploy
+      displayName: 'Build frontend'
+    - task: CopyFiles@2
+      inputs:
+        sourceFolder: 'frontend/dist'
+        targetFolder: 'backend/static'
+    - script: test -f backend/static/index.html
+      displayName: 'Verify index.html exists'
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: 'backend'
+        includeRootFolder: false
+        archiveFile: '$(Build.ArtifactStagingDirectory)/backend.zip'
+    - publish: '$(Build.ArtifactStagingDirectory)/backend.zip'
+      artifact: backend
+
+- stage: DeployDev
+  displayName: 'Deploy DEV'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
+  variables:
+  - group: rigpro-secrets
+  jobs:
+  - deployment: DeployDev
+    environment: rigpro-dev
+    pool: { vmImage: 'ubuntu-latest' }
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: UsePythonVersion@0
+            inputs: { versionSpec: '3.12' }
+          - script: |
+              pip install -r backend/requirements.txt alembic
+              cd backend &amp;&amp; alembic upgrade head
+            env:
+              DATABASE_URL: $(DEV_POSTGRES_CONNECTION_STRING)
+            displayName: 'Run Alembic migrations'
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'rigpro-azure-dev'
+              appType: webAppLinux
+              appName: 'rigpro-app-dev'
+              package: '$(Pipeline.Workspace)/backend/backend.zip'
+          - script: curl --fail https://rigpro-app-dev.azurewebsites.net/api/health
+            displayName: 'Health check'
+
+- stage: DeployProd
+  displayName: 'Deploy PROD'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  variables:
+  - group: rigpro-secrets
+  jobs:
+  - deployment: DeployProd
+    environment: rigpro-prod
+    pool: { vmImage: 'ubuntu-latest' }
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: UsePythonVersion@0
+            inputs: { versionSpec: '3.12' }
+          - script: |
+              pip install -r backend/requirements.txt alembic
+              cd backend &amp;&amp; alembic upgrade head
+            env:
+              DATABASE_URL: $(PROD_POSTGRES_CONNECTION_STRING)
+            displayName: 'Run Alembic migrations'
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'rigpro-azure-prod'
+              appType: webAppLinux
+              appName: 'rigpro-app'
+              package: '$(Pipeline.Workspace)/backend/backend.zip'
+          - script: curl --fail https://rigpro-app.azurewebsites.net/api/health
+            displayName: 'Health check'</code></pre>
+          </li>
+        </ol>
+      </div>
+
+      <div class="problem-item">
+        <div class="problem-title">4. Provision DEV and PROD resources</div>
+        <div class="fix-label">Fix — step by step</div>
+        <ol class="fix-steps">
+          <li>Create both resource groups, plans, web apps and databases (values below use ZIP-deploy-friendly native Python runtimes instead of the container-based commands in <code>AZURE_DEPLOYMENT_GUIDE.md</code> — depends on Open Decision 1):
+            <pre><code># DEV
+az group create --name rigpro-rg-dev --location australiaeast
+az appservice plan create --name rigpro-plan-dev --resource-group rigpro-rg-dev --is-linux --sku B1
+az webapp create --resource-group rigpro-rg-dev --plan rigpro-plan-dev --name rigpro-app-dev --runtime "PYTHON:3.12"
+az postgres flexible-server create --resource-group rigpro-rg-dev --name rigpro-db-dev \
+  --admin-user rigpro --admin-password &lt;PLACEHOLDER&gt; --sku-name Standard_B1ms --tier Burstable --version 15
+
+# PROD
+az group create --name rigpro-rg-prod --location australiaeast
+az appservice plan create --name rigpro-plan-prod --resource-group rigpro-rg-prod --is-linux --sku P1v2
+az webapp create --resource-group rigpro-rg-prod --plan rigpro-plan-prod --name rigpro-app --runtime "PYTHON:3.12"
+az postgres flexible-server create --resource-group rigpro-rg-prod --name rigpro-db-prod \
+  --admin-user rigpro --admin-password &lt;PLACEHOLDER&gt; --sku-name Standard_D2ds_v4 --tier GeneralPurpose --version 15</code></pre>
+          </li>
+        </ol>
+      </div>
+
+      <div class="problem-item">
+        <div class="problem-title">5. Service connections, environments &amp; approval gates</div>
+        <div class="fix-label">Fix — step by step</div>
+        <ol class="fix-steps">
+          <li>Project Settings → Service connections → New → Azure Resource Manager → Service principal (automatic) → scope to <code>rigpro-rg-dev</code> → name it <code>rigpro-azure-dev</code>; repeat scoped to <code>rigpro-rg-prod</code> → name it <code>rigpro-azure-prod</code>. Check "Grant access permission to all pipelines".</li>
+          <li>Pipelines → Environments → New environment → create <code>rigpro-dev</code> (leave with no approval) and <code>rigpro-prod</code>.</li>
+          <li>Open <code>rigpro-prod</code> → ⋮ → "Approvals and checks" → "+" → "Approvals" → add the required approver(s) → Save.</li>
+        </ol>
+      </div>
+
+      <div class="problem-item">
+        <div class="problem-title">6. Secrets / variable group</div>
+        <div class="fix-label">Fix — step by step</div>
+        <ol class="fix-steps">
+          <li>Pipelines → Library → "+ Variable group" → name it <code>rigpro-secrets</code>.</li>
+          <li>Add <code>DEV_POSTGRES_CONNECTION_STRING</code>, <code>PROD_POSTGRES_CONNECTION_STRING</code>, <code>JWT_SECRET_KEY_DEV</code>, <code>JWT_SECRET_KEY_PROD</code>, <code>FRONTEND_ORIGINS_DEV</code>, <code>FRONTEND_ORIGINS_PROD</code> — toggle the lock icon on each to mark it secret.</li>
+          <li>Click "Pipeline permissions" → authorize the pipeline to use the group.</li>
+          <li>Set the equivalent values directly in each App Service's Configuration → Application settings (<code>DATABASE_URL</code>, <code>JWT_SECRET_KEY</code>, <code>FRONTEND_ORIGINS</code>) so the running app — not just the pipeline — has them.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- 3.4 -->
+    <div class="card">
+      <span class="badge" style="background:var(--accent-red-bg);color:var(--accent-red);border:1px solid rgba(248,113,113,0.3);">NOT STARTED</span>
+      <h3>3.4 Layering &amp; conventions (larger, can be phased)</h3>
+      <p class="fix-note" style="margin-top:0;"><strong>Repository layer done</strong> and removed from this list — see §0. What's left below still needs Alembic (§3.2) or stakeholder decisions (§6) first.</p>
+
+      <div class="problem-item" id="fix-audit-columns">
+        <div class="problem-title">1. Inconsistent audit columns</div>
+        <div class="fix-label">Fix — step by step</div>
+        <ol class="fix-steps">
+          <li>Audit <code>db_models.py</code> for tables missing <code>updated_at</code> or <code>created_by</code>/<code>updated_by</code>.</li>
+          <li>Add the missing columns via an Alembic migration, e.g. <code>updated_at</code> with <code>server_default=func.now()</code> and <code>onupdate=func.now()</code>.</li>
+        </ol>
+      </div>
+
+      <div class="problem-item">
+        <div class="problem-title">2. Multi-company / UUID PK decisions</div>
+        <div class="fix-label">Fix — step by step</div>
+        <ol class="fix-steps">
+          <li>Resolve Open Decisions 3 and 4 (below) with stakeholders first.</li>
+          <li>If adopted, implement each as its own dedicated Alembic migration + model change — do not bundle either into unrelated feature work.</li>
+        </ol>
+      </div>
+
+      <div class="problem-item" style="border-top:none;">
+        <div class="problem-title">3. Backfill requirements/design docs for existing services</div>
+        <p class="fix-note"><strong>Done:</strong> templates now exist at <code>docs/requirements/TEMPLATE.md</code> and <code>docs/design/TEMPLATE.md</code> for new work.</p>
+        <div class="fix-label">Remaining steps</div>
+        <ol class="fix-steps">
+          <li>Backfill a requirements/design doc for each existing service that doesn't have one yet, using the templates above.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ DEPLOYMENT PLAN ═══════════════════════════ -->
+  <section>
+    <h2>4. Deployment Plan (Sequenced, Updated)</h2>
+    <div class="workflow-timeline">
+      <div class="wf-step wf-blocking" data-n="0">
+        <div class="wf-title">Phase 0 — Security hotfix <span class="badge badge-amber">PARTIALLY DONE</span></div>
+        <p class="wf-detail">
+          Password hashing and CORS lockdown are done. JWT issuance + <code>get_current_user</code> exist but aren't enforced on the other 17 routers yet. The leaked PAT is stripped locally but not revoked on GitHub.
+        </p>
+      </div>
+      <div class="wf-step" data-n="1">
+        <div class="wf-title">Phase 1 — Repo &amp; branch hygiene <span class="badge badge-amber">PARTIALLY DONE</span></div>
+        <p class="wf-detail">Local <code>dev</code> branch exists. Still needed: push it, set branch policies, delete stray branches, and settle the ADO-vs-GitHub decision.</p>
+      </div>
+      <div class="wf-step" data-n="2">
+        <div class="wf-title">Phase 2 — Migrations <span class="badge" style="background:var(--accent-red-bg);color:var(--accent-red);border:1px solid rgba(248,113,113,0.3);">NOT STARTED</span></div>
+        <p class="wf-detail">Introduce Alembic, baseline current schema, migrate the ad-hoc <code>ALTER TABLE</code> statements into versioned files, remove schema mutation from <code>main.py</code> startup.</p>
+      </div>
+      <div class="wf-step" data-n="3">
+        <div class="wf-title">Phase 3 — Environments <span class="badge" style="background:var(--accent-red-bg);color:var(--accent-red);border:1px solid rgba(248,113,113,0.3);">BLOCKED</span></div>
+        <p class="wf-detail">Provision DEV resource group/App Service/Postgres, then PROD (separate from DEV). Create variable group(s) for secrets; wire App Service configuration for each environment.</p>
+      </div>
+      <div class="wf-step" data-n="4">
+        <div class="wf-title">Phase 4 — Pipeline <span class="badge" style="background:var(--accent-red-bg);color:var(--accent-red);border:1px solid rgba(248,113,113,0.3);">BLOCKED</span></div>
+        <p class="wf-detail">Write <code>azure-pipelines.yml</code>: Build &amp; Package → Deploy DEV (auto on merge to <code>dev</code>) → Deploy PROD (manual approval on merge to <code>main</code>), including Alembic migrate step and health-check against <code>/api/health</code>. Add environments with approval gate on PROD only. (Build+test already automated via GitHub Actions.)</p>
+      </div>
+      <div class="wf-step" data-n="5">
+        <div class="wf-title">Phase 5 — Cutover &amp; verification <span class="badge" style="background:var(--accent-red-bg);color:var(--accent-red);border:1px solid rgba(248,113,113,0.3);">NOT STARTED</span></div>
+        <p class="wf-detail">Deploy to DEV, run the verification checklist, get sign-off. Merge <code>dev</code> → <code>main</code>, approve PROD deploy, verify PROD, decommission the old manual deployment path once PROD is confirmed healthy.</p>
+      </div>
+      <div class="wf-step" data-n="6">
+        <div class="wf-title">Phase 6 — Layering cleanup <span class="badge" style="background:var(--accent-red-bg);color:var(--accent-red);border:1px solid rgba(248,113,113,0.3);">NOT STARTED</span></div>
+        <p class="wf-detail">Extract <code>repositories/</code> layer, tighten DB model conventions, backfill requirements/design docs for existing services.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════ VERIFICATION CHECKLIST ═══════════════════════════ -->
+  <section>
+    <h2>5. Verification Checklist (remaining, before any environment goes live)</h2>
+    <ul class="checklist">
+      <li>Every API endpoint (not just <code>/api/auth/me</code>) rejects requests without a valid token</li>
+      <li><code>alembic upgrade head</code> runs clean against a fresh DB and against a copy of current prod-shaped data</li>
+      <li>DEV and PROD point at separate databases and storage</li>
+      <li>PROD deploy pauses for manual approval and is not reachable via direct push to <code>main</code></li>
+      <li>No secrets present in YAML, docs, or source — only in variable groups / App Service settings</li>
+      <li>Leaked PAT confirmed revoked on GitHub</li>
+      <li>Confirmed whether the <code>AZURE_DEPLOYMENT_GUIDE.md</code> example password was ever live; rotated if so</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════ OPEN DECISIONS ═══════════════════════════ -->
+  <section>
+    <h2>6. Open Decisions (blocking §3.3 and parts of §3.4)</h2>
+
+    <div class="decision">
+      <div class="q">1. Container (current Dockerfile) vs. ZIP Deploy (Northsails' App Service pattern)?</div>
+      <p style="margin:0;">The reference pipeline assumes a non-container App Service with <code>pip install</code> + ZIP deploy. RigPro currently builds a Docker image. Keeping Docker means the pipeline looks more like build-and-push-to-ACR-then-deploy; matching the doc exactly means dropping the Dockerfile-based deploy in favor of ZIP deploy.</p>
+    </div>
+    <div class="decision">
+      <div class="q">2. Azure DevOps vs. GitHub + Azure Pipelines?</div>
+      <p style="margin:0;">Do you have (or want) an <code>northsails.visualstudio.com</code> project for this repo, or should the pipeline run from the existing GitHub repo?</p>
+    </div>
+    <div class="decision">
+      <div class="q">3. Single-tenant vs. multi-company?</div>
+      <p style="margin:0;">Should RigPro adopt <code>company_id</code> on all tables (Northsails' default rule), or is it intentionally single-tenant?</p>
+    </div>
+    <div class="decision">
+      <div class="q">4. UUID primary keys?</div>
+      <p style="margin:0;">Worth the migration effort to switch existing string IDs to UUIDs, or keep current IDs and treat that rule as non-binding for this app?</p>
+    </div>
+  </section>
+
+  <div class="doc-footer">RigPro — Northsails Deployment Plan — July 2026</div>
+</div>
+</body>
+</html>

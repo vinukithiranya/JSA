@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RigPro × North Intelligence — Standalone vs. Integrate</title>
+<style>
+  :root {
+    --bg-primary: #0f1420;
+    --bg-secondary: #161c2c;
+    --border: #2a3348;
+    --border-light: #33405c;
+    --text-primary: #e8ecf4;
+    --text-secondary: #b4bdd1;
+    --text-muted: #7c88a3;
+    --accent-blue: #60a5fa;
+    --accent-purple: #c084fc;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-green-bg: rgba(74,222,128,0.1);
+    --accent-amber-bg: rgba(251,191,36,0.1);
+    --accent-red-bg: rgba(248,113,113,0.1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .doc-container { max-width: 900px; margin: 0 auto; padding: 40px 24px 80px; }
+  .doc-header { margin-bottom: 32px; }
+  h1 { color: var(--text-primary); font-size: 25px; margin: 8px 0 10px; }
+  h2 {
+    color: var(--text-primary);
+    font-size: 18px;
+    margin: 36px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { color: var(--text-primary); font-size: 14.5px; margin: 18px 0 6px; }
+  p { margin: 8px 0; }
+  code {
+    background: rgba(148,163,184,0.12);
+    color: var(--accent-blue);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: "SF Mono", Consolas, Menlo, monospace;
+  }
+  strong { color: var(--text-primary); }
+
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-right: 8px;
+  }
+  .tag-date { background: rgba(96,165,250,0.12); color: var(--accent-blue); }
+  .tag-recommend { background: var(--accent-green-bg); color: var(--accent-green); }
+
+  .recommend-box {
+    border: 1px solid rgba(74,222,128,0.35);
+    background: rgba(74,222,128,0.06);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 18px 0;
+  }
+  .recommend-box .label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--accent-green);
+    margin-bottom: 6px;
+  }
+  .recommend-box p:last-child { margin-bottom: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+
+  ol, ul { padding-left: 22px; margin: 8px 0; }
+  li { margin: 5px 0; }
+
+  .card {
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    background: var(--bg-secondary);
+  }
+  .card-red { border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.05); }
+  .card-red h3 { color: var(--accent-red); margin-top: 0; }
+  .card h3:first-child { margin-top: 0; }
+
+  .conflict-grid { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
+  .conflict-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+  }
+  .conflict-item .n {
+    flex-shrink: 0;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent-red-bg);
+    color: var(--accent-red);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    border: 1px solid rgba(248,113,113,0.3);
+  }
+  .conflict-item .title { font-weight: 600; color: var(--text-primary); font-size: 14px; margin-bottom: 3px; }
+  .conflict-item .desc { font-size: 13.5px; color: var(--text-muted); margin: 0; }
+
+  .doc-footer {
+    margin-top: 50px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg-primary: #f7f8fb;
+      --bg-secondary: #ffffff;
+      --border: #e2e6ee;
+      --border-light: #d7dce6;
+      --text-primary: #1a2033;
+      --text-secondary: #3d4560;
+      --text-muted: #7a8299;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="doc-container">
+
+  <div class="doc-header">
+    <h1>RigPro × North Intelligence — Standalone vs. Integrate</h1>
+    <div class="meta">
+      <span class="tag tag-date">July 2026</span>
+      <span class="tag tag-recommend">Recommendation: standalone + SSO/nav integration</span>
+    </div>
+    <p style="margin-top:14px;">
+      Prompted by: manager's suggestion to integrate RigPro with the North Intelligence platform to lower
+      development and maintenance cost. This assessment is based on a direct audit of the North Intelligence
+      codebase at <code>C:\Users\vinukiT\Downloads\north-intelligence</code> — not just its published docs.
+    </p>
+  </div>
+
+  <div class="recommend-box">
+    <div class="label">Recommendation</div>
+    <p><strong>Keep RigPro as its own standalone app</strong> (own FastAPI process, own Postgres database, own SQLAlchemy models, own Vite frontend). Integrate only at the <strong>login and navigation level</strong>: shared Azure AD / SSO so users log in once, plus a tile/link inside North Intelligence's home page pointing at RigPro's own URL.</p>
+    <p>This gets the "one place our team goes, one login" outcome non-technical stakeholders usually mean by "integrate," without forcing either codebase to violate its own architecture.</p>
+  </div>
+
+  <h2>Why Full Integration Doesn't Actually Lower Cost Here</h2>
+  <p>North Intelligence is a single-process monorepo (one FastAPI app, one Postgres instance, one React SPA, one deploy pipeline) built on two architectural decisions that directly conflict with how RigPro is built today:</p>
+
+  <div class="conflict-grid">
+    <div class="conflict-item">
+      <div class="n">1</div>
+      <div>
+        <div class="title">No ORM, by formal decision</div>
+        <p class="desc">North Intelligence has a reaffirmed ADR (<code>adr-001-raw-sql-over-orm.html</code>) banning SQLAlchemy-as-ORM — everything is raw SQL via <code>psycopg2</code> + <code>RealDictCursor</code>. RigPro is built entirely on SQLAlchemy 2.0 ORM models, and its <code>repositories/</code> layer was just built around that ORM. Integrating as a real service means either rewriting all 17 domains off the ORM, or permanently running a second, contradictory data-access pattern inside their monorepo.</p>
+      </div>
+    </div>
+    <div class="conflict-item">
+      <div class="n">2</div>
+      <div>
+        <div class="title">Different frontend stack</div>
+        <p class="desc">North Intelligence is Create React App + MUI v7 throughout. RigPro is Vite + React 18 with no MUI. Merging means rebuilding RigPro's UI on CRA and likely re-skinning it in MUI to look native inside the shell.</p>
+      </div>
+    </div>
+    <div class="conflict-item">
+      <div class="n">3</div>
+      <div>
+        <div class="title">Different auth model</div>
+        <p class="desc">North Intelligence trusts Azure Easy Auth headers (<code>X-MS-CLIENT-PRINCIPAL-NAME</code>) injected by the App Service platform — no JWT validation in app code at all. RigPro's newly-built JWT auth (<code>core/security.py</code>, <code>get_current_user</code>) would become dead code in a true integration; access would instead be gated through their <code>azure_groups(company_id, service_id, role)</code> model.</p>
+      </div>
+    </div>
+    <div class="conflict-item">
+      <div class="n">4</div>
+      <div>
+        <div class="title">No plugin/registry mechanism</div>
+        <p class="desc">Adding a "service" inside North Intelligence means manually touching ~7 places: a router file, a <code>main.py</code> <code>include_router</code> call, a <code>ServiceDefinition</code> dict entry in <code>config/services.py</code>, a frontend route, a hardcoded array entry in <code>HomePage.js</code>, a new component folder, and a new migration folder. Even their own reference service ("3D Tracking") doesn't consistently follow their documented layering — there's no framework doing this for you.</p>
+      </div>
+    </div>
+    <div class="conflict-item">
+      <div class="n">5</div>
+      <div>
+        <div class="title">Shared blast radius</div>
+        <p class="desc">One FastAPI process and one deploy pipeline means a bug or bad migration in RigPro could break North Intelligence's other 12 services' deploy, and vice versa — where today they fail independently.</p>
+      </div>
+    </div>
+  </div>
+
+  <p>
+    RigPro is a full production application (~35 users, 17 domains) — not a small feature. Full integration would
+    front-load a large rewrite (ORM → raw SQL, Vite → CRA, JWT → Easy-Auth-headers) <strong>before</strong> any
+    maintenance savings could begin, and would require taking on North Intelligence's own architectural debt
+    (partial Alembic adoption, inconsistent service layering) as RigPro's problem too.
+  </p>
+
+  <h2>What North Intelligence Is Actually Built On (Audit Findings)</h2>
+  <table>
+    <thead><tr><th>Area</th><th>North Intelligence</th><th>RigPro</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Structure</strong></td><td>Monorepo, single deploy unit (one FastAPI process, one React SPA, one Postgres instance)</td><td>Standalone repo, own process/DB/frontend</td></tr>
+      <tr><td><strong>Data access</strong></td><td>Raw SQL / <code>psycopg2</code> + <code>RealDictCursor</code> — ORM explicitly forbidden (ADR-001)</td><td>SQLAlchemy 2.0 ORM + repository layer</td></tr>
+      <tr><td><strong>Migrations</strong></td><td>Mostly hand-written numbered <code>.sql</code> files per service (77 files); Alembic adopted for only 1 of 13 services so far</td><td>Not yet on Alembic (planned next)</td></tr>
+      <tr><td><strong>Multi-tenancy</strong></td><td><code>company_id</code> on users/groups/dashboards only, not on every domain table; access via <code>azure_groups(company_id, service_id, role)</code></td><td>Single-tenant, no <code>company_id</code></td></tr>
+      <tr><td><strong>Auth</strong></td><td>Azure Easy Auth headers trusted by the app; no JWT validation in code</td><td>JWT issuance + <code>get_current_user</code> (just built)</td></tr>
+      <tr><td><strong>Frontend</strong></td><td>Create React App + MUI v7, one SPA with hardcoded per-service routes/nav</td><td>Vite + React 18, no MUI</td></tr>
+      <tr><td><strong>Deployment</strong></td><td>One Azure DevOps pipeline, one ZIP deploy to one App Service per environment</td><td>Docker image, currently manual/Railway</td></tr>
+      <tr><td><strong>Size</strong></td><td>~22k backend + ~38k frontend lines, 13 registered services — medium, actively growing</td><td>17 domains, single application</td></tr>
+    </tbody>
+  </table>
+
+  <h2>The Lightweight Integration Path (Recommended)</h2>
+  <ol>
+    <li>Put RigPro behind the same Azure AD tenant / SSO that North Intelligence uses, so users authenticate once.</li>
+    <li>Add a tile or link for RigPro inside North Intelligence's <code>HomePage.js</code> services list, pointing at RigPro's own URL (optionally reverse-proxied under the same domain for a seamless feel).</li>
+    <li>Keep RigPro's own FastAPI process, Postgres database, SQLAlchemy models, and Vite frontend exactly as they are.</li>
+  </ol>
+  <p>This captures the "single pane of glass, one login" value without either app needing to abandon its own architecture, and without merging two different data-access and UI conventions into one codebase long-term.</p>
+
+  <div class="card card-red">
+    <h3>When Full Monorepo Integration Would Actually Make Sense</h3>
+    <ul>
+      <li>If RigPro were small — a handful of screens, not 17 domains — the rewrite cost would be proportionally low.</li>
+      <li>If RigPro were being built from scratch today and could adopt raw-SQL + CRA + Easy-Auth from day one, instead of retrofitting an existing app onto someone else's conventions.</li>
+    </ul>
+    <p style="margin-bottom:0;">Neither condition applies today.</p>
+  </div>
+
+  <div class="doc-footer">RigPro — Standalone vs. Integrate Decision — July 2026</div>
+</div>
+</body>
+</html>

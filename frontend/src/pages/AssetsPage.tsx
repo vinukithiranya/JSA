@@ -56,24 +56,28 @@ const EMPTY_READING = {
   date: new Date().toISOString().split("T")[0],
 };
 
+/** Returns the Tailwind CSS class string for the given asset status badge. */
 function statusBadge(status: string): string {
   if (status === "active") return "bg-brand-100 text-brand-700";
   if (status === "maintenance") return "bg-amber-100 text-amber-700";
   return "bg-gray-100 text-gray-600";
 }
 
+/** Returns a human-readable label for the given asset status value. */
 function statusLabel(status: string): string {
   if (status === "active") return "Active";
   if (status === "maintenance") return "Maintenance";
   return "Inactive";
 }
 
+/** Formats a date string as a localised "DD Mon YYYY" string for display. */
 function fmt(d: string) {
   return new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
+/** Renders an animated placeholder card shown while assets are loading. */
 function SkeletonCard() {
   return (
     <div className="animate-pulse rounded-xl border border-brand-100 bg-white p-4 shadow-sm">
@@ -90,6 +94,7 @@ function SkeletonCard() {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
+/** Renders the Assets page with a filterable grid of asset cards, add/edit and detail slide-in panels, and reading/delete modals. */
 export default function AssetsPage({ user, onLogout }: Props) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);

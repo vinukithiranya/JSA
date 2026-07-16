@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Development Guide — North Intelligence</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<div class="doc-container">
+  <div class="doc-header">
+    <div class="breadcrumb">
+      <a href="../index.html">Docs</a> <span class="sep">/</span> <a href="../index.html#guides">Guides</a> <span class="sep">/</span> Development Guide
+    </div>
+    <h1>Development Guide</h1>
+    <div class="meta">
+      <span class="tag tag-date">May 2026</span>
+    </div>
+  </div>
+
+  <section>
+    <h2>Workflow</h2>
+    <p>New service or major feature? Follow this order:</p>
+    <ol>
+      <li><strong>Requirements</strong> — <code>docs/requirements/[service].html</code> (use template)</li>
+      <li><strong>Design</strong> — <code>docs/design/[service].html</code> (use template)</li>
+      <li><strong>Implement</strong> — Database first, then backend, then frontend</li>
+      <li><strong>Verify</strong> — Test multi-company, access control, end-to-end</li>
+    </ol>
+    <p>Bug fixes and small enhancements (&lt; 3 files) can skip steps 1–2.</p>
+  </section>
+
+  <section>
+    <h2>Rules</h2>
+
+    <h3>Documentation first</h3>
+    <p>No new service without a requirements doc. No new tables without a design doc.</p>
+
+    <h3>Multi-company by default</h3>
+    <p>Every new table needs a <code>company_id</code> FK unless there's a documented reason not to.</p>
+
+    <h3>Layer separation</h3>
+    <ul>
+      <li><strong>Routes</strong> — Thin: auth check + delegate to repo/service</li>
+      <li><strong>Repositories</strong> — SQL only, no business logic</li>
+      <li><strong>Services</strong> — Business logic only (no FastAPI types, no SQL)</li>
+      <li><strong>Models</strong> — Pydantic validation only</li>
+    </ul>
+
+    <h3>Project layout</h3>
+    <ul>
+      <li>Place new service repositories under <code>backend/repositories/&lt;domain&gt;/</code> (e.g. <code>repositories/machineshop/machineshop_repository.py</code>) — <strong>not</strong> at the top level of <code>repositories/</code>.</li>
+      <li>Place new service business logic under <code>backend/services/&lt;domain&gt;/</code> (e.g. <code>services/machineshop/machineshop_service.py</code>).</li>
+      <li>Cross-service helpers (user, company, group, base) live in <code>repositories/shared/</code>.</li>
+      <li>Frontend components are already grouped by service under <code>frontend/src/components/&lt;service&gt;/</code> — keep new code in the matching folder.</li>
+    </ul>
+
+    <h3>Security</h3>
+    <ul>
+      <li>SQL: always <code>%s</code> params, never f-strings</li>
+      <li>Auth: every endpoint uses <code>get_current_user</code> or <code>get_user_email</code></li>
+      <li>Access: new services check <code>check_service_access</code></li>
+      <li>No <code>.env</code> or credentials in code</li>
+    </ul>
+
+    <h3>Database</h3>
+    <ul>
+      <li>UUID primary keys, <code>TIMESTAMPTZ</code> for dates</li>
+      <li><code>created_at</code> / <code>updated_at</code> on every table</li>
+      <li><code>created_by</code> / <code>updated_by</code> on user-editable tables</li>
+      <li>Idempotent migrations (<code>IF NOT EXISTS</code>)</li>
+      <li>Update <code>backend/database/schema</code> after every migration</li>
+    </ul>
+
+    <h3>Frontend</h3>
+    <ul>
+      <li><code>npm run build:deploy</code> (not <code>npm run build</code>)</li>
+      <li>Material UI only, functional components only</li>
+      <li>Service tabs conditional on <code>accessible_services</code></li>
+    </ul>
+
+    <h3>Runtime</h3>
+    <ul>
+      <li>Python <strong>3.12</strong> for backend (CI and App Service)</li>
+      <li>Node.js <strong>20</strong> for frontend build</li>
+      <li>Health endpoint: <code>GET /api/health</code> — DB-ping liveness probe; App Service should be configured to use it</li>
+      <li>Logs go to <strong>stdout</strong> (configured in <code>backend/main.py</code>) — App Service log stream captures them</li>
+    </ul>
+
+    <h3>Follow existing patterns</h3>
+    <p>The <strong>3D Tracking</strong> service is the reference implementation. When in doubt, look at how it does it.</p>
+
+    <h3>Git</h3>
+    <ul>
+      <li>Develop on <code>dev</code>, feature branches for large changes</li>
+      <li>Never commit <code>.env</code>, <code>node_modules/</code>, <code>venv/</code>, <code>__pycache__/</code></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Verification Checklist</h2>
+    <p>Before deploying:</p>
+    <ul class="checklist">
+      <li>API endpoints return correct data</li>
+      <li>Multi-company filtering works</li>
+      <li>Access control enforced (403 for unauthorized)</li>
+      <li>Frontend renders correctly</li>
+      <li>Migration is idempotent</li>
+      <li>Schema file updated</li>
+      <li><code>npm run build:deploy</code> succeeds</li>
+      <li>No hardcoded values or debug code</li>
+    </ul>
+  </section>
+
+  <div class="doc-footer">North Intelligence Platform — May 2026</div>
+</div>
+</body>
+</html>

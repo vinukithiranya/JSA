@@ -26,6 +26,7 @@ LIGHT_GRAY  = RGBColor(0xF5, 0xF5, 0xF5)
 ACCENT_RED  = RGBColor(0xC0, 0x39, 0x2B)
 
 def set_cell_bg(cell, hex_color):
+    """Sets the background fill colour of a table cell using an XML shading element."""
     tc   = cell._tc
     tcPr = tc.get_or_add_tcPr()
     shd  = OxmlElement('w:shd')
@@ -35,6 +36,7 @@ def set_cell_bg(cell, hex_color):
     tcPr.append(shd)
 
 def set_cell_borders(cell, top=None, bottom=None, left=None, right=None):
+    """Applies selective border styling to a table cell's specified sides."""
     tc   = cell._tc
     tcPr = tc.get_or_add_tcPr()
     tcBorders = OxmlElement('w:tcBorders')
@@ -49,6 +51,7 @@ def set_cell_borders(cell, top=None, bottom=None, left=None, right=None):
     tcPr.append(tcBorders)
 
 def para_style(para, bold=False, italic=False, size=11, color=DARK_GRAY, align=None, space_before=0, space_after=6):
+    """Applies font and paragraph formatting to all runs in a paragraph."""
     for run in para.runs:
         run.bold   = bold
         run.italic = italic
@@ -61,6 +64,7 @@ def para_style(para, bold=False, italic=False, size=11, color=DARK_GRAY, align=N
         para.alignment = align
 
 def add_heading(doc, text, level=1):
+    """Adds a styled heading paragraph at the specified level (1, 2, or 3) to the document."""
     p = doc.add_paragraph()
     run = p.add_run(text)
     run.bold = True
@@ -92,6 +96,7 @@ def add_heading(doc, text, level=1):
     return p
 
 def add_body(doc, text, bold=False, italic=False, color=DARK_GRAY):
+    """Adds a styled body-text paragraph to the document."""
     p = doc.add_paragraph()
     run = p.add_run(text)
     run.bold   = bold
@@ -103,6 +108,7 @@ def add_body(doc, text, bold=False, italic=False, color=DARK_GRAY):
     return p
 
 def add_bullet(doc, text, bold_prefix=None):
+    """Adds a bullet-list paragraph with an optional bold prefix run to the document."""
     p = doc.add_paragraph(style='List Bullet')
     if bold_prefix:
         r1 = p.add_run(bold_prefix)
@@ -121,6 +127,7 @@ def add_bullet(doc, text, bold_prefix=None):
     return p
 
 def add_callout(doc, text, bg='EAF4E6', border_color='377133'):
+    """Adds a coloured single-cell callout box containing italic green text to the document."""
     tbl = doc.add_table(rows=1, cols=1)
     tbl.style = 'Table Grid'
     cell = tbl.rows[0].cells[0]

@@ -30,6 +30,7 @@ const EMPTY_FORM = {
   assigned_users: "",
 };
 
+/** Renders the scheduling management page with tabs for schedules and upcoming occurrences. */
 export default function SchedulingPage({ user, onLogout }: Props) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [occurrences, setOccurrences] = useState<ScheduleOccurrence[]>([]);
@@ -41,14 +42,17 @@ export default function SchedulingPage({ user, onLogout }: Props) {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"schedules" | "upcoming">("schedules");
 
+  /** Fetches all schedules from the API and updates state. */
   const loadSchedules = () =>
     api<Schedule[]>("/api/schedules").then(setSchedules).catch(() => null);
 
+  /** Fetches all schedule occurrences from the API and updates state. */
   const loadAllOccs = () =>
     api<ScheduleOccurrence[]>("/api/schedules/occurrences/all").then(setOccurrences).catch(() => null);
 
   useEffect(() => { loadSchedules(); loadAllOccs(); }, []);
 
+  /** Selects a schedule and loads its occurrences from the API. */
   const openSchedule = (s: Schedule) => {
     setSelected(s);
     api<ScheduleOccurrence[]>(`/api/schedules/${s.id}/occurrences`)
@@ -56,6 +60,7 @@ export default function SchedulingPage({ user, onLogout }: Props) {
       .catch(() => null);
   };
 
+  /** Validates and submits the create schedule form, then refreshes schedule data. */
   const handleCreate = async () => {
     if (!form.title.trim()) { setError("Title is required"); return; }
     if (!form.template_id.trim()) { setError("Template ID is required"); return; }
@@ -84,11 +89,13 @@ export default function SchedulingPage({ user, onLogout }: Props) {
     }
   };
 
+  /** Toggles the active/paused state of a schedule. */
   const toggleSchedule = async (s: Schedule) => {
     await api(`/api/schedules/${s.id}/toggle`, { method: "PATCH" });
     loadSchedules();
   };
 
+  /** Marks a schedule occurrence as completed and refreshes occurrence data. */
   const completeOcc = async (occ: ScheduleOccurrence) => {
     await api(`/api/schedules/occurrences/${occ.id}/complete`, {
       method: "PATCH",
@@ -98,12 +105,14 @@ export default function SchedulingPage({ user, onLogout }: Props) {
     loadAllOccs();
   };
 
+  /** Marks a schedule occurrence as missed and refreshes occurrence data. */
   const missOcc = async (occ: ScheduleOccurrence) => {
     await api(`/api/schedules/occurrences/${occ.id}/miss`, { method: "PATCH" });
     if (selected) openSchedule(selected);
     loadAllOccs();
   };
 
+  /** Formats an ISO date string into a human-readable day/month/year string. */
   const fmt = (d: string) =>
     new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 

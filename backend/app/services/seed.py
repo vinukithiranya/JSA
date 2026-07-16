@@ -895,6 +895,7 @@ def _has_questions(form_schema: dict) -> bool:
 
 
 def _ensure_templates(db: Session) -> None:
+    """Insert or update seed templates in the database if they are missing or empty."""
     for tdata in _RICH_TEMPLATES:
         existing = db.query(TemplateDB).filter(TemplateDB.id == tdata["id"]).first()
         if existing is None:
@@ -915,6 +916,7 @@ def _ensure_templates(db: Session) -> None:
 
 
 def seed_defaults(db: Session) -> None:
+    """Seed the database with default admin users and inspection templates if none exist."""
     try:
         users_count = db.query(UserDB).count()
     except Exception:

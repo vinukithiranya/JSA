@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models.db_models import ActionCommentDB, ActionDB
+from app.repositories import actions_repository as repo
 from app.schemas.models import (
     ActionCommentCreate,
     ActionCommentOut,
@@ -18,7 +18,8 @@ from app.services.store import new_id
 router = APIRouter()
 
 
-def _to_out(row: ActionDB) -> ActionOut:
+def _to_out(row) -> ActionOut:
+    """Convert an ActionDB database row to an ActionOut schema."""
     return ActionOut(
         id=row.id,
         title=row.title,
@@ -39,7 +40,9 @@ def _to_out(row: ActionDB) -> ActionOut:
 
 @router.post("", response_model=ActionOut)
 def create_action(payload: ActionCreate, db: Session = Depends(get_db)) -> ActionOut:
-    row = ActionDB(
+    """Create a new action and notify the assigned user if one is specified."""
+    row = repo.create(
+        db,
         id=new_id("act"),
         title=payload.title,
         description=payload.description,
@@ -53,8 +56,6 @@ def create_action(payload: ActionCreate, db: Session = Depends(get_db)) -> Actio
         linked_jsa_id=payload.linked_jsa_id,
         created_by=payload.created_by,
     )
-    db.add(row)
-    db.flush()
 
     if payload.assigned_to:
         due_label = f" — due {payload.due_date}" if payload.due_date else ""
@@ -77,18 +78,15 @@ def list_actions(
     priority: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[ActionOut]:
-    q = db.query(ActionDB)
-    if status:
-        q = q.filter(ActionDB.status == status)
-    if priority:
-        q = q.filter(ActionDB.priority == priority)
-    rows = q.order_by(ActionDB.created_at.desc()).all()
+    """Return all actions, optionally filtered by status and/or priority."""
+    rows = repo.list_all(db, status=status, priority=priority)
     return [_to_out(r) for r in rows]
 
 
 @router.get("/{action_id}", response_model=ActionOut)
 def get_action(action_id: str, db: Session = Depends(get_db)) -> ActionOut:
-    row = db.query(ActionDB).filter(ActionDB.id == action_id).first()
+    """Retrieve a single action by its ID."""
+    row = repo.get(db, action_id)
     if not row:
         raise HTTPException(status_code=404, detail="Action not found")
     return _to_out(row)
@@ -98,7 +96,8 @@ def get_action(action_id: str, db: Session = Depends(get_db)) -> ActionOut:
 def update_action_status(
     action_id: str, payload: ActionStatusUpdate, db: Session = Depends(get_db)
 ) -> ActionOut:
-    row = db.query(ActionDB).filter(ActionDB.id == action_id).first()
+    """Update the status of an action and notify the creator when it is completed."""
+    row = repo.get(db, action_id)
     if not row:
         raise HTTPException(status_code=404, detail="Action not found")
     row.status = payload.status
@@ -119,10 +118,11 @@ def update_action_status(
 
 @router.delete("/{action_id}", status_code=204)
 def delete_action(action_id: str, db: Session = Depends(get_db)) -> None:
-    row = db.query(ActionDB).filter(ActionDB.id == action_id).first()
+    """Delete an action by its ID."""
+    row = repo.get(db, action_id)
     if not row:
         raise HTTPException(status_code=404, detail="Action not found")
-    db.delete(row)
+    repo.delete(db, row)
     db.commit()
 
 
@@ -130,12 +130,8 @@ def delete_action(action_id: str, db: Session = Depends(get_db)) -> None:
 
 @router.get("/{action_id}/comments", response_model=list[ActionCommentOut])
 def list_comments(action_id: str, db: Session = Depends(get_db)) -> list[ActionCommentOut]:
-    rows = (
-        db.query(ActionCommentDB)
-        .filter(ActionCommentDB.action_id == action_id)
-        .order_by(ActionCommentDB.created_at.asc())
-        .all()
-    )
+    """Return all comments for the specified action in chronological order."""
+    rows = repo.list_comments(db, action_id)
     return [
         ActionCommentOut(
             id=r.id,
@@ -152,18 +148,17 @@ def list_comments(action_id: str, db: Session = Depends(get_db)) -> list[ActionC
 def add_comment(
     action_id: str, payload: ActionCommentCreate, db: Session = Depends(get_db)
 ) -> ActionCommentOut:
-    action = db.query(ActionDB).filter(ActionDB.id == action_id).first()
+    """Add a new comment to the specified action."""
+    action = repo.get(db, action_id)
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
-    comment = ActionCommentDB(
+    comment = repo.add_comment(
+        db,
         id=new_id("ac"),
         action_id=action_id,
         user_id=payload.user_id,
         message=payload.message,
     )
-    db.add(comment)
-    db.commit()
-    db.refresh(comment)
     return ActionCommentOut(
         id=comment.id,
         action_id=comment.action_id,
@@ -177,7 +172,8 @@ def add_comment(
 
 @router.get("/stats/summary")
 def actions_summary(db: Session = Depends(get_db)) -> dict:
-    all_actions = db.query(ActionDB).all()
+    """Return a summary of all actions including counts by status, priority, and overdue items."""
+    all_actions = repo.list_all(db)
     total = len(all_actions)
     by_status: dict[str, int] = {}
     by_priority: dict[str, int] = {}

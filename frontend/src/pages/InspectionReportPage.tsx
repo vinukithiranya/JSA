@@ -38,6 +38,7 @@ const STATUS_COLORS: Record<string, string> = {
   approved:         "bg-green-100 text-green-800",
 };
 
+/** Renders the full detail report for a single inspection, including KPIs, flagged items, and all section responses. */
 export default function InspectionReportPage({ user, onLogout }: Props) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -53,6 +54,7 @@ export default function InspectionReportPage({ user, onLogout }: Props) {
     api<TemplateData>(`/api/inspections/${id}/template`).then(setTplData);
   }, [id]);
 
+  /** Submits an approval request for the current inspection and updates local state. */
   const handleApprove = async () => {
     if (!id || !user) return;
     setApproving(true);
@@ -67,13 +69,16 @@ export default function InspectionReportPage({ user, onLogout }: Props) {
     }
   };
 
+  /** Opens the PDF report for the current inspection in a new browser tab. */
   const handlePrint = () => {
     window.open(`${import.meta.env.VITE_API_URL ?? ""}/api/inspections/${id}/report`, "_blank");
   };
 
+  /** Formats a date string into a human-readable Australian locale date and time string. */
   const fmt = (d: string) =>
     new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
+  /** Returns a display string for an answer value, normalising nulls, arrays, and primitives. */
   const fmtVal = (val: unknown): string => {
     if (val === null || val === undefined || val === "") return "—";
     if (Array.isArray(val)) return val.join(", ");

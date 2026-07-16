@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.models.db_models import InspectionRecordDB, IssueDB, TemplateDB
+from app.repositories import inspections_repository, issues_repository, templates_repository
 from app.schemas.models import (
     InspectionAnswersUpdate,
     InspectionApproveRequest,
@@ -22,6 +22,7 @@ router = APIRouter()
 
 
 def _count_questions(form_schema: dict) -> int:
+    """Return the total number of questions across all sections of a form schema."""
     total = 0
     for section in form_schema.get("sections", []):
         total += len(section.get("questions", []))
@@ -53,7 +54,8 @@ def _calc_score(form_schema: dict, answers: dict) -> float:
     return round((earned / max_pts) * 100, 1)
 
 
-def _to_out(row: InspectionRecordDB) -> InspectionOut:
+def _to_out(row) -> InspectionOut:
+    """Convert an InspectionRecordDB ORM row to an InspectionOut schema object."""
     return InspectionOut(
         id=row.id,
         template_id=row.template_id,
@@ -79,7 +81,8 @@ def _to_out(row: InspectionRecordDB) -> InspectionOut:
 
 @router.get("/stats/summary")
 def inspections_summary(db: Session = Depends(get_db)) -> dict:
-    rows = db.query(InspectionRecordDB).all()
+    """Return aggregate statistics for all inspections including counts by status and average score."""
+    rows = inspections_repository.list_all(db)
     total = len(rows)
     by_status: dict[str, int] = {}
     scores = [r.score for r in rows if r.score is not None]
@@ -99,21 +102,21 @@ def list_inspections(
     status: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[InspectionOut]:
-    q = db.query(InspectionRecordDB)
-    if status:
-        q = q.filter(InspectionRecordDB.status == status)
-    rows = q.order_by(InspectionRecordDB.started_at.desc()).all()
+    """Return all inspections, optionally filtered by status, ordered by start time descending."""
+    rows = inspections_repository.list_all(db, status=status)
     return [_to_out(r) for r in rows]
 
 
 @router.post("", response_model=InspectionOut)
 def start_inspection(payload: InspectionStart, db: Session = Depends(get_db)) -> InspectionOut:
-    tpl = db.query(TemplateDB).filter(TemplateDB.id == payload.template_id).first()
+    """Create and persist a new in-progress inspection record from the given template."""
+    tpl = templates_repository.get_by_id(db, payload.template_id)
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
 
     total = _count_questions(tpl.form_schema)
-    row = InspectionRecordDB(
+    row = inspections_repository.create(
+        db,
         id=new_id("insp"),
         template_id=payload.template_id,
         template_name=tpl.name,
@@ -127,15 +130,13 @@ def start_inspection(payload: InspectionStart, db: Session = Depends(get_db)) ->
         total_questions=total,
         answered_questions=0,
     )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
     return _to_out(row)
 
 
 @router.get("/{inspection_id}", response_model=InspectionOut)
 def get_inspection(inspection_id: str, db: Session = Depends(get_db)) -> InspectionOut:
-    row = db.query(InspectionRecordDB).filter(InspectionRecordDB.id == inspection_id).first()
+    """Retrieve a single inspection record by its ID."""
+    row = inspections_repository.get(db, inspection_id)
     if not row:
         raise HTTPException(status_code=404, detail="Inspection not found")
     return _to_out(row)
@@ -149,7 +150,8 @@ def save_answers(
     payload: InspectionAnswersUpdate,
     db: Session = Depends(get_db),
 ) -> InspectionOut:
-    row = db.query(InspectionRecordDB).filter(InspectionRecordDB.id == inspection_id).first()
+    """Merge new answers into an existing inspection and update the answered question count."""
+    row = inspections_repository.get(db, inspection_id)
     if not row:
         raise HTTPException(status_code=404, detail="Inspection not found")
 
@@ -179,11 +181,12 @@ def complete_inspection(
     payload: InspectionCompleteRequest,
     db: Session = Depends(get_db),
 ) -> InspectionOut:
-    row = db.query(InspectionRecordDB).filter(InspectionRecordDB.id == inspection_id).first()
+    """Mark an inspection as pending approval, calculate its score, raise issues for flagged items, and notify supervisors."""
+    row = inspections_repository.get(db, inspection_id)
     if not row:
         raise HTTPException(status_code=404, detail="Inspection not found")
 
-    tpl = db.query(TemplateDB).filter(TemplateDB.id == row.template_id).first()
+    tpl = templates_repository.get_by_id(db, row.template_id)
     score = _calc_score(tpl.form_schema if tpl else {}, row.answers or {})
 
     row.status = "pending_approval"
@@ -194,7 +197,8 @@ def complete_inspection(
     # Auto-create an Issue for each non-skipped flagged item
     active_flags = [f for f in payload.flagged_items if not f.skipped]
     for flagged in active_flags:
-        db.add(IssueDB(
+        issues_repository.create(
+            db,
             id=new_id("iss"),
             title=f"Flagged: {flagged.question_text}",
             description=(
@@ -210,7 +214,7 @@ def complete_inspection(
             reported_by=row.conducted_by,
             media_urls=[],
             custom_answers={},
-        ))
+        )
 
     # Notify supervisors based on score and flags
     site_label = f" — {row.site}" if row.site else ""
@@ -253,7 +257,8 @@ def approve_inspection(
     payload: InspectionApproveRequest,
     db: Session = Depends(get_db),
 ) -> InspectionOut:
-    row = db.query(InspectionRecordDB).filter(InspectionRecordDB.id == inspection_id).first()
+    """Approve an inspection, recording the approver and optional supervisor signature."""
+    row = inspections_repository.get(db, inspection_id)
     if not row:
         raise HTTPException(status_code=404, detail="Inspection not found")
     row.status = "approved"
@@ -269,10 +274,11 @@ def approve_inspection(
 
 @router.get("/{inspection_id}/template")
 def get_inspection_template(inspection_id: str, db: Session = Depends(get_db)) -> dict:
-    row = db.query(InspectionRecordDB).filter(InspectionRecordDB.id == inspection_id).first()
+    """Return the form schema and metadata for the template associated with an inspection."""
+    row = inspections_repository.get(db, inspection_id)
     if not row:
         raise HTTPException(status_code=404, detail="Inspection not found")
-    tpl = db.query(TemplateDB).filter(TemplateDB.id == row.template_id).first()
+    tpl = templates_repository.get_by_id(db, row.template_id)
     if not tpl:
         raise HTTPException(status_code=404, detail="Template not found")
     return {"template": tpl.form_schema, "name": tpl.name, "description": tpl.description}
@@ -282,11 +288,12 @@ def get_inspection_template(inspection_id: str, db: Session = Depends(get_db)) -
 
 @router.get("/{inspection_id}/report")
 def get_inspection_report(inspection_id: str, db: Session = Depends(get_db)) -> FileResponse:
-    row = db.query(InspectionRecordDB).filter(InspectionRecordDB.id == inspection_id).first()
+    """Generate a PDF report for an inspection and return it as a file download."""
+    row = inspections_repository.get(db, inspection_id)
     if not row:
         raise HTTPException(status_code=404, detail="Inspection not found")
 
-    tpl = db.query(TemplateDB).filter(TemplateDB.id == row.template_id).first()
+    tpl = templates_repository.get_by_id(db, row.template_id)
     template_schema = tpl.form_schema if tpl else {"sections": []}
 
     inspection_out = _to_out(row)
@@ -304,12 +311,29 @@ def get_inspection_report(inspection_id: str, db: Session = Depends(get_db)) -> 
     return FileResponse(str(output_file), media_type="application/pdf", filename=f"Inspection_{safe_name}.pdf")
 
 
+# ─── Archive ─────────────────────────────────────────────────────────────────
+
+@router.patch("/{inspection_id}/archive", response_model=InspectionOut)
+def archive_inspection(inspection_id: str, db: Session = Depends(get_db)) -> InspectionOut:
+    """Set an inspection's status to archived, removing it from the active queue."""
+    row = inspections_repository.get(db, inspection_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Inspection not found")
+    if row.status not in ("in_progress",):
+        raise HTTPException(status_code=400, detail="Only in-progress inspections can be archived")
+    row.status = "archived"
+    db.commit()
+    db.refresh(row)
+    return _to_out(row)
+
+
 # ─── Delete ───────────────────────────────────────────────────────────────────
 
 @router.delete("/{inspection_id}", status_code=204)
 def delete_inspection(inspection_id: str, db: Session = Depends(get_db)) -> None:
-    row = db.query(InspectionRecordDB).filter(InspectionRecordDB.id == inspection_id).first()
+    """Delete an inspection record from the database by its ID."""
+    row = inspections_repository.get(db, inspection_id)
     if not row:
         raise HTTPException(status_code=404, detail="Inspection not found")
-    db.delete(row)
+    inspections_repository.delete(db, row)
     db.commit()

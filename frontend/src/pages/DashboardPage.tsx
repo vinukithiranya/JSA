@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
-import { api, type DashboardSummary } from "../api";
+import { api } from "../api";
 import type { User } from "../types";
 
 type Props = { user: User | null; onLogout: () => void };
@@ -40,6 +40,7 @@ const BG_STYLE: React.CSSProperties = {
 
 // ── Chart primitives ────────────────────────────────────────────────
 
+/** Renders a small SVG bar chart from an array of numeric data values. */
 function MiniBarChart({ data, color = "#499241" }: { data: number[]; color?: string }) {
   const max = Math.max(...data, 1);
   const W = 100, H = 48;
@@ -54,6 +55,7 @@ function MiniBarChart({ data, color = "#499241" }: { data: number[]; color?: str
   );
 }
 
+/** Renders a small SVG line chart with a gradient fill from an array of numeric data values. */
 function MiniLineChart({ data, color = "#499241" }: { data: number[]; color?: string }) {
   if (data.length < 2) return null;
   const max = Math.max(...data, 1), min = Math.min(...data, 0), rng = max - min || 1;
@@ -75,6 +77,7 @@ function MiniLineChart({ data, color = "#499241" }: { data: number[]; color?: st
   );
 }
 
+/** Renders a donut chart SVG composed of colored arc segments proportional to each segment's value. */
 function DonutChart({ segments, size = 120 }: { segments: { value: number; color: string; label: string }[]; size?: number }) {
   const total = segments.reduce((a, s) => a + s.value, 0) || 1;
   const r = size * 0.34, cx = size / 2, cy = size / 2;
@@ -94,6 +97,7 @@ function DonutChart({ segments, size = 120 }: { segments: { value: number; color
 
 // ── Reusable display helpers ────────────────────────────────────────
 
+/** Renders a centered loading spinner animation. */
 function Spinner() {
   return (
     <div className="flex items-center justify-center py-24">
@@ -102,6 +106,7 @@ function Spinner() {
   );
 }
 
+/** Renders a labeled horizontal bar row showing a value relative to a max. */
 function BarRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
@@ -115,6 +120,7 @@ function BarRow({ label, value, max, color }: { label: string; value: number; ma
   );
 }
 
+/** Renders a labeled progress bar showing a current value as a fraction of the total. */
 function GlassBar({ label, current, total, color }: { label: string; current: number; total: number; color: string }) {
   const pct = total > 0 ? (current / total) * 100 : 0;
   return (
@@ -132,9 +138,9 @@ function GlassBar({ label, current, total, color }: { label: string; current: nu
 
 // ── Main combined page ──────────────────────────────────────────────
 
+/** Renders the main dashboard page with tabbed analytics for inspections, issues, and actions. */
 export default function DashboardPage({ user, onLogout }: Props) {
   const [tab, setTab]               = useState<Tab>("overview");
-  const [dashSummary, setDash]      = useState<DashboardSummary | null>(null);
   const [inspStats, setInspStats]   = useState<InspectionStats | null>(null);
   const [issueStats, setIssueStats] = useState<IssueStats | null>(null);
   const [actionStats, setActStats]  = useState<ActionStats | null>(null);
@@ -144,12 +150,11 @@ export default function DashboardPage({ user, onLogout }: Props) {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api<DashboardSummary>("/api/dashboard/summary"),
       api<InspectionStats>("/api/analytics/inspections"),
       api<IssueStats>("/api/analytics/issues"),
       api<ActionStats>("/api/analytics/actions"),
     ])
-      .then(([d, insp, iss, act]) => { setDash(d); setInspStats(insp); setIssueStats(iss); setActStats(act); })
+      .then(([insp, iss, act]) => { setInspStats(insp); setIssueStats(iss); setActStats(act); })
       .catch(() => null)
       .finally(() => setLoading(false));
   }, []);
@@ -174,13 +179,11 @@ export default function DashboardPage({ user, onLogout }: Props) {
   const quickActions = [
     { to: "/inspections", label: "Inspections",  icon: "📋", cls: "bg-brand-600/90 text-white hover:bg-brand-700/90 border-brand-500/50" },
     { to: "/issues",      label: "Report Issue",  icon: "⚠️",  cls: "bg-red-500/80  text-white hover:bg-red-600/80   border-red-400/50"   },
-    { to: "/actions",     label: "Actions",        icon: "✓",   cls: "bg-white/30    text-brand-900 hover:bg-white/50 border-white/40"      },
-    { to: "/scheduling",  label: "Scheduling",     icon: "📅",  cls: "bg-white/30    text-brand-900 hover:bg-white/50 border-white/40"      },
-    { to: "/documents",   label: "Documents",      icon: "≡",   cls: "bg-white/30    text-brand-900 hover:bg-white/50 border-white/40"      },
-    { to: "/sync",        label: "Offline Sync",   icon: "↻",   cls: "bg-white/30    text-brand-900 hover:bg-white/50 border-white/40"      },
+    { to: "/actions",     label: "Actions",        icon: "✓",   cls: "bg-white/30    text-brand-900 hover:bg-white/50 border-white/40" },
+    { to: "/scheduling",  label: "Scheduling",     icon: "📅",  cls: "bg-white/30    text-brand-900 hover:bg-white/50 border-white/40" },
+    { to: "/documents",   label: "Documents",      icon: "≡",   cls: "bg-white/30    text-brand-900 hover:bg-white/50 border-white/40" },
     ...(isSup ? [
       { to: "/supervisor", label: "Approvals",    icon: "⊙",  cls: "bg-amber-500/80 text-white hover:bg-amber-600/80 border-amber-400/50" },
-      { to: "/forms",      label: "Form Builder", icon: "⊞",  cls: "bg-white/30     text-brand-900 hover:bg-white/50 border-white/40"     },
     ] : []),
   ];
 
@@ -455,18 +458,6 @@ export default function DashboardPage({ user, onLogout }: Props) {
                     </div>
                   )}
 
-                  {/* Legacy JSA */}
-                  {dashSummary && dashSummary.kpi.total_jsa > 0 && (
-                    <div className={`${GLASS} p-5`}>
-                      <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide mb-4">Legacy JSA Records</p>
-                      <div className="space-y-3">
-                        {dashSummary.status_breakdown.map(item => {
-                          const jsaColors: Record<string,string> = { draft:"#9fd78a", pending_approval:"#f59e0b", approved:"#22c55e" };
-                          return <GlassBar key={item.status} label={item.status.replace(/_/g," ")} current={item.count} total={dashSummary.kpi.total_jsa} color={jsaColors[item.status] ?? "#9fd78a"} />;
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}

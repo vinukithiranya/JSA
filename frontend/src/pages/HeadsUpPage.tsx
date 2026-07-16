@@ -20,6 +20,7 @@ interface HeadsUp {
 
 const SITE_OPTIONS = ["All Sites", "Site A", "Site B", "Site C", "Site D"];
 
+/** Returns a human-readable relative time string (e.g. "5m ago") for a given ISO date string. */
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -34,6 +35,7 @@ function timeAgo(dateStr: string): string {
 
 const EMPTY_FORM = { title: "", body: "", sites: [] as string[] };
 
+/** Renders the Heads Up page displaying workplace announcements with acknowledge and delete controls. */
 export default function HeadsUpPage({ user, onLogout }: Props) {
   const [announcements, setAnnouncements] = useState<HeadsUp[]>([]);
   const [showModal, setShowModal] = useState(false);

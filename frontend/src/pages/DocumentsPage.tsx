@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
-import { api } from "../api";
+import { api, authHeader, downloadFile } from "../api";
 import type { DocumentItem, User } from "../types";
 
 type Props = { user: User | null; onLogout: () => void };
 
+/** Renders the documents library page with upload form and document listing. */
 export default function DocumentsPage({ user, onLogout }: Props) {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState("SOP");
   const [folder, setFolder] = useState("General");
 
+  /** Fetches the list of documents from the API and updates state. */
   async function load() {
     const data = await api<DocumentItem[]>("/api/documents");
     setDocuments(data);
@@ -20,6 +22,7 @@ export default function DocumentsPage({ user, onLogout }: Props) {
     load().catch(() => null);
   }, []);
 
+  /** Uploads the selected file with category and folder metadata, then reloads the document list. */
   async function upload() {
     if (!file) return;
     const formData = new FormData();
@@ -30,6 +33,7 @@ export default function DocumentsPage({ user, onLogout }: Props) {
 
     await fetch("/api/documents/upload", {
       method: "POST",
+      headers: authHeader(),
       body: formData,
     });
 
@@ -55,9 +59,12 @@ export default function DocumentsPage({ user, onLogout }: Props) {
               <article key={doc.id} className="rounded-xl bg-white p-3">
                 <p className="font-semibold text-brand-900">{doc.original_filename}</p>
                 <p className="text-sm text-brand-700">{doc.category} / {doc.folder}</p>
-                <a className="text-sm text-brand-800 underline" href={`/${doc.file_path.replace(/\\/g, "/")}`} target="_blank">
+                <button
+                  className="text-sm text-brand-800 underline"
+                  onClick={() => downloadFile(`/api/documents/${doc.id}/download`)}
+                >
                   Open file
-                </a>
+                </button>
               </article>
             ))}
             {documents.length === 0 ? <p>No documents uploaded yet.</p> : null}

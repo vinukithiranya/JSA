@@ -1,8 +1,9 @@
-from app.models.db_models import DocumentDB, JsaRecordDB, TemplateDB
-from app.schemas.models import DocumentOut, HazardOut, JsaRecord, TemplateOut
+from app.models.db_models import DocumentDB, TemplateDB
+from app.schemas.models import DocumentOut, TemplateOut
 
 
 def to_template_out(record: TemplateDB) -> TemplateOut:
+    """Convert a TemplateDB database record to a TemplateOut schema object."""
     return TemplateOut(
         id=record.id,
         name=record.name,
@@ -12,27 +13,8 @@ def to_template_out(record: TemplateDB) -> TemplateOut:
     )
 
 
-def to_jsa_out(record: JsaRecordDB) -> JsaRecord:
-    hazards = [HazardOut(**item) for item in (record.hazards or [])]
-    return JsaRecord(
-        id=record.id,
-        job_number=record.job_number,
-        boat_name=record.boat_name,
-        service_log_number=record.service_log_number,
-        location=record.location,
-        date=record.date,
-        status=record.status,
-        steps=record.work_steps or [],
-        answers=record.questionnaire_answers or {},
-        hazards=hazards,
-        ppe_list=record.ppe_list or [],
-        created_at=record.created_at,
-        supervisor_signature=record.supervisor_signature,
-        approved_by=record.approved_by,
-    )
-
-
 def to_document_out(record: DocumentDB) -> DocumentOut:
+    """Convert a DocumentDB database record to a DocumentOut schema object."""
     return DocumentOut(
         id=record.id,
         filename=record.filename,

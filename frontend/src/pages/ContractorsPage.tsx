@@ -55,11 +55,13 @@ const EMPTY_DOC = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Returns the number of days from now until the given date string. */
 function daysUntil(dateStr: string): number {
   if (!dateStr) return Infinity;
   return (new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
 }
 
+/** Returns the expiry status of a contractor document based on its expiry date. */
 function docStatus(doc: ContractorDoc): "expired" | "expiring" | "valid" {
   const days = daysUntil(doc.expiry_date);
   if (days < 0) return "expired";
@@ -67,41 +69,48 @@ function docStatus(doc: ContractorDoc): "expired" | "expiring" | "valid" {
   return "valid";
 }
 
+/** Returns the CSS class for a document table row based on its expiry status. */
 function docRowClass(status: "expired" | "expiring" | "valid"): string {
   if (status === "expired") return "bg-red-50";
   if (status === "expiring") return "bg-amber-50";
   return "bg-brand-50/30";
 }
 
+/** Returns the CSS class for a document status badge based on its expiry status. */
 function docBadgeClass(status: "expired" | "expiring" | "valid"): string {
   if (status === "expired") return "bg-red-100 text-red-700";
   if (status === "expiring") return "bg-amber-100 text-amber-700";
   return "bg-brand-100 text-brand-700";
 }
 
+/** Returns the display label for a document status badge. */
 function docBadgeLabel(status: "expired" | "expiring" | "valid"): string {
   if (status === "expired") return "Expired";
   if (status === "expiring") return "Expiring Soon";
   return "Valid";
 }
 
+/** Returns the CSS class for a contractor status badge. */
 function statusBadge(status: string): string {
   if (status === "active") return "bg-brand-100 text-brand-700";
   if (status === "pending") return "bg-amber-100 text-amber-700";
   return "bg-red-100 text-red-700";
 }
 
+/** Returns the display label for a contractor status value. */
 function statusLabel(status: string): string {
   if (status === "active") return "Active";
   if (status === "pending") return "Pending";
   return "Expired";
 }
 
+/** Formats a date string into a human-readable Australian locale date. */
 function fmt(d: string) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/** Returns a summary expiry status for a contractor's full set of documents. */
 function getDocsSummary(docs: ContractorDoc[]): "ok" | "expiring" | "expired" | "none" {
   if (!docs || docs.length === 0) return "none";
   const statuses = docs.map(docStatus);
@@ -112,6 +121,7 @@ function getDocsSummary(docs: ContractorDoc[]): "ok" | "expiring" | "expired" | 
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
+/** Renders the Contractors page with a filterable table, add/edit panel, detail view, and document management. */
 export default function ContractorsPage({ user, onLogout }: Props) {
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(true);

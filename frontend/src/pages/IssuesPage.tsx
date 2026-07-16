@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import { api } from "../api";
 import type { Issue, IssueComment, IssueType, IssueStatus, Priority, User } from "../types";
+import { cacheIssues, getCachedIssues, saveLocalIssue, type LocalIssue } from "../offlineSync";
 
 type Props = { user: User | null; onLogout: () => void };
 
@@ -52,6 +53,7 @@ const EMPTY_ACTION_FORM = {
   priority: "medium" as Priority,
 };
 
+/** Renders the Issues & Observations page with filtering, reporting, detail drawer, and comments. */
 export default function IssuesPage({ user, onLogout }: Props) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -71,32 +73,68 @@ export default function IssuesPage({ user, onLogout }: Props) {
   const [actionSaving, setActionSaving] = useState(false);
   const [actionError, setActionError] = useState("");
 
-  const load = () => {
+  /** Fetches issues from the API (or IndexedDB when offline), applying filters. */
+  const load = async () => {
     const params = new URLSearchParams();
     if (filterStatus !== "all") params.set("status", filterStatus);
     if (filterPriority !== "all") params.set("priority", filterPriority);
     if (filterType !== "all") params.set("issue_type", filterType);
-    api<Issue[]>(`/api/issues?${params}`).then(setIssues).catch(() => null);
+    try {
+      const data = await api<Issue[]>(`/api/issues?${params}`);
+      setIssues(data);
+      cacheIssues(data as unknown as LocalIssue[]).catch(() => null);
+    } catch {
+      let cached = (await getCachedIssues().catch(() => [])) as unknown as Issue[];
+      if (filterStatus !== "all") cached = cached.filter(i => i.status === filterStatus);
+      if (filterPriority !== "all") cached = cached.filter(i => i.priority === filterPriority);
+      if (filterType !== "all") cached = cached.filter(i => i.issue_type === filterType);
+      setIssues(cached);
+    }
   };
 
-  useEffect(load, [filterStatus, filterPriority, filterType]);
+  useEffect(() => { load().catch(() => null); }, [filterStatus, filterPriority, filterType]);
 
+  /** Opens the detail drawer for the given issue and loads its comments. */
   const openDetail = (issue: Issue) => {
     setSelected(issue);
     api<IssueComment[]>(`/api/issues/${issue.id}/comments`).then(setComments).catch(() => null);
   };
 
+  /** Submits the new issue form (or queues it offline) and updates the issues list. */
   const handleCreate = async () => {
     if (!form.title.trim()) { setError("Title is required"); return; }
     setSaving(true); setError("");
+
+    if (!navigator.onLine) {
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const local: LocalIssue = {
+        id, ...form,
+        status: "open",
+        latitude: null, longitude: null,
+        media_urls: [], custom_answers: {},
+        reported_by: user?.id ?? "u-tech",
+        assigned_to: null, linked_jsa_id: null,
+        created_at: now, updated_at: null, resolved_at: null,
+        _offline: true,
+      };
+      await saveLocalIssue(local).catch(() => null);
+      setIssues(prev => [local as unknown as Issue, ...prev]);
+      setShowForm(false);
+      setForm({ ...EMPTY_FORM });
+      setSaving(false);
+      return;
+    }
+
     try {
-      await api<Issue>("/api/issues", {
+      const issue = await api<Issue>("/api/issues", {
         method: "POST",
         body: JSON.stringify({ ...form, reported_by: user?.id ?? "u-tech" }),
       });
+      saveLocalIssue({ ...issue, _offline: false } as unknown as LocalIssue).catch(() => null);
+      setIssues(prev => [issue, ...prev]);
       setShowForm(false);
       setForm({ ...EMPTY_FORM });
-      load();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to create issue");
     } finally {
@@ -104,6 +142,7 @@ export default function IssuesPage({ user, onLogout }: Props) {
     }
   };
 
+  /** Creates a corrective action linked to the currently selected issue. */
   const handleCreateAction = async () => {
     if (!selected) return;
     if (!actionForm.title.trim()) { setActionError("Title is required"); return; }
@@ -131,6 +170,7 @@ export default function IssuesPage({ user, onLogout }: Props) {
     }
   };
 
+  /** Updates the status of an issue via the API and refreshes the view. */
   const handleStatusChange = async (issue: Issue, status: IssueStatus) => {
     await api(`/api/issues/${issue.id}/status`, {
       method: "PATCH",
@@ -140,6 +180,7 @@ export default function IssuesPage({ user, onLogout }: Props) {
     load();
   };
 
+  /** Posts a new comment on the selected issue and appends it to the comments list. */
   const handleComment = async () => {
     if (!commentMsg.trim() || !selected) return;
     const c = await api<IssueComment>(`/api/issues/${selected.id}/comments`, {
@@ -150,6 +191,7 @@ export default function IssuesPage({ user, onLogout }: Props) {
     setCommentMsg("");
   };
 
+  /** Formats an ISO date string as a localised Australian date. */
   const fmt = (d: string) => new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 
   return (

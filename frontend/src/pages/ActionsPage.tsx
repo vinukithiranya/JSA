@@ -45,12 +45,14 @@ const EMPTY_FORM = {
   linked_jsa_id: "",
 };
 
+/** Returns true if the action is past its due date and not yet complete or cancelled. */
 function isOverdue(action: Action): boolean {
   if (!action.due_date) return false;
   if (action.status === "complete" || action.status === "cant_do") return false;
   return new Date(action.due_date) < new Date();
 }
 
+/** Renders the Actions page with a filterable list of actions, a creation modal, and a detail drawer with status controls and comments. */
 export default function ActionsPage({ user, onLogout }: Props) {
   const [actions, setActions] = useState<Action[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("all");

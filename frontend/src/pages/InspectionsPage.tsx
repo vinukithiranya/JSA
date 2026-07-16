@@ -3,6 +3,11 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
 import { api } from "../api";
 import type { User, FormTemplate } from "../types";
+import {
+  cacheInspections, getCachedInspections,
+  cacheTemplates, getCachedTemplates,
+  saveLocalInspection, getLocalInspection, type LocalInspection,
+} from "../offlineSync";
 
 type InspectionRecord = {
   id: string;
@@ -11,19 +16,21 @@ type InspectionRecord = {
   title: string;
   site: string;
   conducted_by: string;
-  status: "in_progress" | "completed" | "approved";
+  status: "in_progress" | "completed" | "approved" | "pending_approval" | "archived";
   score: number | null;
   total_questions: number;
   answered_questions: number;
   started_at: string;
   completed_at: string | null;
   flagged_items: { question_text: string; answer_value: string; action_created: boolean; skipped: boolean }[];
+  _offline?: boolean;
 };
 
 type Props = { user: User | null; onLogout: () => void };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Returns a human-readable date label ("Today", "Yesterday", or a formatted date string) for an ISO date string. */
 function dateLabel(iso: string): string {
   const d = new Date(iso);
   d.setHours(0, 0, 0, 0);
@@ -34,6 +41,7 @@ function dateLabel(iso: string): string {
   return d.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
 }
 
+/** Groups an array of inspection records by their start date label and returns an array of labeled groups. */
 function groupByDate(items: InspectionRecord[]): { label: string; items: InspectionRecord[] }[] {
   const map = new Map<string, InspectionRecord[]>();
   for (const item of items) {
@@ -44,20 +52,25 @@ function groupByDate(items: InspectionRecord[]): { label: string; items: Inspect
   return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
 }
 
+/** Formats an ISO date string as a short localised date (e.g. "09 Jun 2026"). */
 function fmt(d: string) {
   return new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  in_progress: "bg-amber-100 text-amber-700 border border-amber-200",
-  completed:   "bg-brand-100 text-brand-700 border border-brand-200",
-  approved:    "bg-green-100 text-green-700 border border-green-200",
+  in_progress:      "bg-amber-100 text-amber-700 border border-amber-200",
+  completed:        "bg-brand-100 text-brand-700 border border-brand-200",
+  approved:         "bg-green-100 text-green-700 border border-green-200",
+  pending_approval: "bg-blue-100 text-blue-700 border border-blue-200",
+  archived:         "bg-gray-100 text-gray-500 border border-gray-200",
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  in_progress: "In Progress",
-  completed:   "Completed",
-  approved:    "Approved",
+  in_progress:      "In Progress",
+  completed:        "Completed",
+  approved:         "Approved",
+  pending_approval: "Pending Approval",
+  archived:         "Archived",
 };
 
 const CATEGORY_BADGE: Record<string, string> = {
@@ -68,6 +81,7 @@ const CATEGORY_BADGE: Record<string, string> = {
 
 // ── Score circle ──────────────────────────────────────────────────────────────
 
+/** Renders a colour-coded percentage score indicator for an inspection. */
 function ScoreCircle({ score, status, pct }: { score: number | null; status: string; pct: number }) {
   const display = status === "in_progress" ? pct : (score ?? null);
   const color =
@@ -83,6 +97,7 @@ function ScoreCircle({ score, status, pct }: { score: number | null; status: str
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+/** Renders the Inspections page with a tabbed list of active and archived inspections and a modal to start a new inspection. */
 export default function InspectionsPage({ user, onLogout }: Props) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<"active" | "archive">("active");
@@ -96,15 +111,35 @@ export default function InspectionsPage({ user, onLogout }: Props) {
   const [startError, setStartError] = useState("");
 
   useEffect(() => {
-    api<InspectionRecord[]>("/api/inspections").then(setInspections).catch(() => null);
+    (async () => {
+      try {
+        const data = await api<InspectionRecord[]>("/api/inspections");
+        setInspections(data);
+        cacheInspections(data as unknown as LocalInspection[]).catch(() => null);
+      } catch {
+        const cached = await getCachedInspections().catch(() => []);
+        setInspections(cached as unknown as InspectionRecord[]);
+      }
+    })();
   }, []);
 
   useEffect(() => {
-    api<FormTemplate[]>("/api/templates").then(setTemplates).catch(() => null);
+    (async () => {
+      try {
+        const data = await api<FormTemplate[]>("/api/templates");
+        setTemplates(data);
+        cacheTemplates(data as unknown as Parameters<typeof cacheTemplates>[0]).catch(() => null);
+      } catch {
+        const cached = await getCachedTemplates().catch(() => []);
+        setTemplates(cached as unknown as FormTemplate[]);
+      }
+    })();
   }, []);
 
-  const activeInspections = inspections.filter((i) => i.status === "in_progress" || i.status === "completed");
-  const archivedInspections = inspections.filter((i) => i.status === "approved");
+  const activeInspections = inspections.filter((i) =>
+    i.status === "in_progress" || i.status === "completed" || i.status === "pending_approval"
+  );
+  const archivedInspections = inspections.filter((i) => i.status === "approved" || i.status === "archived");
   const shown = tab === "active" ? activeInspections : archivedInspections;
   const groups = groupByDate(shown);
 
@@ -113,10 +148,42 @@ export default function InspectionsPage({ user, onLogout }: Props) {
     (t.description ?? "").toLowerCase().includes(tplSearch.toLowerCase())
   );
 
+  function countTemplateQuestions(schema: FormTemplate["form_schema"]): number {
+    return (schema.sections ?? []).reduce((n, s) => n + (s.questions?.length ?? 0), 0);
+  }
+
   const handleStart = async () => {
     if (!selectedTpl) return;
     setStarting(true);
     setStartError("");
+
+    if (!navigator.onLine) {
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      await saveLocalInspection({
+        id,
+        template_id: selectedTpl.id,
+        template_name: selectedTpl.name,
+        title: selectedTpl.name,
+        site,
+        conducted_by: user?.id ?? "u-tech",
+        status: "in_progress",
+        answers: {},
+        flagged_items: [],
+        score: null,
+        total_questions: countTemplateQuestions(selectedTpl.form_schema),
+        answered_questions: 0,
+        started_at: now,
+        completed_at: null,
+        approved_by: null,
+        supervisor_signature: null,
+        pdf_url: null,
+        _offline: true,
+      });
+      navigate(`/inspections/conduct/${id}`);
+      return;
+    }
+
     try {
       const insp = await api<InspectionRecord>("/api/inspections", {
         method: "POST",
@@ -127,6 +194,7 @@ export default function InspectionsPage({ user, onLogout }: Props) {
           conducted_by: user?.id ?? "u-tech",
         }),
       });
+      saveLocalInspection({ ...insp, _offline: false } as unknown as LocalInspection).catch(() => null);
       navigate(`/inspections/conduct/${insp.id}`);
     } catch (e: unknown) {
       setStartError(e instanceof Error ? e.message : "Failed to start. Check the backend is running.");
@@ -135,8 +203,25 @@ export default function InspectionsPage({ user, onLogout }: Props) {
   };
 
   const openInspection = (insp: InspectionRecord) => {
-    if (insp.status === "in_progress") navigate(`/inspections/conduct/${insp.id}`);
+    if (insp.status === "in_progress" || insp.status === "archived") navigate(`/inspections/conduct/${insp.id}`);
     else navigate(`/inspections/report/${insp.id}`);
+  };
+
+  const handleArchive = async (id: string) => {
+    if (!confirm("Archive this inspection? It will move to the Archive tab.")) return;
+    const insp = inspections.find((i) => i.id === id);
+    if (insp?._offline) {
+      const local = await getLocalInspection(id).catch(() => null);
+      if (local) await saveLocalInspection({ ...local, status: "archived" }).catch(() => null);
+      setInspections((prev) => prev.map((i) => i.id === id ? { ...i, status: "archived" } : i));
+      return;
+    }
+    try {
+      await api(`/api/inspections/${id}/archive`, { method: "PATCH" });
+      setInspections((prev) => prev.map((i) => i.id === id ? { ...i, status: "archived" } : i));
+    } catch {
+      alert("Failed to archive. Please try again.");
+    }
   };
 
   return (
@@ -196,7 +281,7 @@ export default function InspectionsPage({ user, onLogout }: Props) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                 </svg>
                 <p className="font-semibold text-brand-600">No archived inspections</p>
-                <p className="mt-1 text-sm text-brand-400">Approved inspections will appear here</p>
+                <p className="mt-1 text-sm text-brand-400">Approved and archived inspections appear here</p>
               </>
             ) : (
               <>
@@ -234,12 +319,17 @@ export default function InspectionsPage({ user, onLogout }: Props) {
                 <div
                   key={insp.id}
                   onClick={() => openInspection(insp)}
-                  className="grid cursor-pointer grid-cols-[2fr_1fr_1fr_1fr_1fr] items-center border-b border-brand-50 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-brand-50"
+                  className="group grid cursor-pointer grid-cols-[2fr_1fr_1fr_1fr_1fr] items-center border-b border-brand-50 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-brand-50"
                 >
                   {/* Inspection name + template */}
                   <div className="min-w-0 pr-4">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-medium text-brand-900">{insp.title}</span>
+                      {insp._offline && (
+                        <span className="shrink-0 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-600">
+                          Pending sync
+                        </span>
+                      )}
                       {flagged > 0 && (
                         <span className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
                           {flagged} flagged
@@ -278,12 +368,22 @@ export default function InspectionsPage({ user, onLogout }: Props) {
 
                   {/* Status */}
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[insp.status]}`}>
-                      {STATUS_LABEL[insp.status]}
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[insp.status] ?? "bg-gray-100 text-gray-500"}`}>
+                      {STATUS_LABEL[insp.status] ?? insp.status}
                     </span>
-                    <svg className="ml-auto h-4 w-4 text-brand-300" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
+                    {insp.status === "in_progress" ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleArchive(insp.id); }}
+                        title="Archive inspection"
+                        className="ml-auto hidden rounded-md border border-gray-200 px-2 py-0.5 text-xs text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-red-500 group-hover:block"
+                      >
+                        Archive
+                      </button>
+                    ) : (
+                      <svg className="ml-auto h-4 w-4 text-brand-300" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    )}
                   </div>
                 </div>
               );

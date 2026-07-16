@@ -2,6 +2,10 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import type { User } from "../types";
+import {
+  getLocalInspection, saveLocalInspection,
+  getCachedTemplate, type LocalInspection,
+} from "../offlineSync";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -74,12 +78,14 @@ type Props = { user: User | null; onLogout: () => void };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Returns true if the given answer value matches any of the question's flagged responses. */
 function isFlagged(q: TQuestion, value: AnswerState["value"]): boolean {
   if (!q.flagged_responses?.length || value === null || value === undefined) return false;
   const s = Array.isArray(value) ? value.join(", ") : String(value);
   return q.flagged_responses.includes(s);
 }
 
+/** Evaluates a single logic rule against an answer value and returns whether the rule condition is met. */
 function evalRule(rule: LogicRule, value: AnswerState["value"]): boolean {
   const v = value === null || value === undefined ? "" : String(value);
   const num = parseFloat(v);
@@ -105,6 +111,7 @@ function evalRule(rule: LogicRule, value: AnswerState["value"]): boolean {
   }
 }
 
+/** Returns the set of logic triggers whose rules are satisfied by the given answer value. */
 function activeTriggers(q: TQuestion, value: AnswerState["value"]): Set<LogicTrigger> {
   const active = new Set<LogicTrigger>();
   for (const rule of q.logic_rules ?? []) {
@@ -113,20 +120,24 @@ function activeTriggers(q: TQuestion, value: AnswerState["value"]): Set<LogicTri
   return active;
 }
 
+/** Returns true if an answer state has a non-empty, non-null value. */
 function isAnswered(a: AnswerState | undefined): boolean {
   if (!a) return false;
   const v = a.value;
   return v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
 }
 
+/** Recursively collects all question IDs from a list of questions including nested questions. */
 function collectQids(questions: TQuestion[]): string[] {
   return questions.flatMap(q => [q.id, ...(q.nested_questions ? collectQids(q.nested_questions) : [])]);
 }
 
+/** Returns all question IDs across all sections of the given form schema. */
 function allQids(schema: FormSchema): string[] {
   return schema.sections.flatMap(s => collectQids(s.questions));
 }
 
+/** Calculates the total earned and maximum possible scores for a list of questions based on current answers. */
 function scoreQuestions(questions: TQuestion[], answers: Record<string, AnswerState>): { earned: number; max: number } {
   let earned = 0; let max = 0;
   for (const q of questions) {
@@ -147,12 +158,14 @@ function scoreQuestions(questions: TQuestion[], answers: Record<string, AnswerSt
   return { earned, max };
 }
 
+/** Returns the earned and maximum scores for a single section based on current answers. */
 function sectionScore(section: TSection, answers: Record<string, AnswerState>): { earned: number; max: number } {
   return scoreQuestions(section.questions, answers);
 }
 
 // ── Response Renderers ────────────────────────────────────────────────────────
 
+/** Renders a dropdown select input for choosing an inspection site. */
 function SiteInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="relative">
@@ -169,6 +182,7 @@ function SiteInput({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
+/** Renders a date/time input for capturing the inspection date, time, or both. */
 function InspDateInput({ value, onChange, includeDate = true, includeTime = true }:
   { value: string; onChange: (v: string) => void; includeDate?: boolean; includeTime?: boolean }) {
   return (
@@ -179,6 +193,7 @@ function InspDateInput({ value, onChange, includeDate = true, includeTime = true
   );
 }
 
+/** Renders a text input for entering a document number, optionally formatted with a template. */
 function DocNumberInput({ value, onChange, format }: { value: string; onChange: (v: string) => void; format?: string }) {
   const placeholder = format ? format.replace("[number]", "000001") : "000001";
   return (
@@ -188,6 +203,7 @@ function DocNumberInput({ value, onChange, format }: { value: string; onChange: 
   );
 }
 
+/** Renders a text input for entering a person's name. */
 function PersonInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <input type="text" value={value} onChange={e => onChange(e.target.value)}
@@ -195,6 +211,7 @@ function PersonInput({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
+/** Renders a dropdown select input for choosing an asset. */
 function AssetInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="relative">
@@ -210,6 +227,7 @@ function AssetInput({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
+/** Renders a dropdown select input for choosing a company with an informational note. */
 function CompanyInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="space-y-1.5">
@@ -231,6 +249,7 @@ function CompanyInput({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
+/** Renders a textarea and map button for entering or capturing an inspection location. */
 function InspLocationInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex gap-2">
@@ -245,6 +264,7 @@ function InspLocationInput({ value, onChange }: { value: string; onChange: (v: s
   );
 }
 
+/** Renders a grid of toggle buttons for selecting one option from a multiple-choice question. */
 function MultipleChoiceInput({ q, value, onChange }: { q: TQuestion; value: string | null; onChange: (v: string) => void }) {
   const opts = q.option_meta?.map(m => m.label) ?? q.options ?? ["Yes", "No", "N/A"];
   return (
@@ -268,6 +288,7 @@ function MultipleChoiceInput({ q, value, onChange }: { q: TQuestion; value: stri
   );
 }
 
+/** Renders a single-line or multi-line text input depending on the specified format. */
 function TextAnswerInput({ value, onChange, format }: { value: string; onChange: (v: string) => void; format?: "short" | "long" }) {
   if (format === "long") {
     return (
@@ -282,6 +303,7 @@ function TextAnswerInput({ value, onChange, format }: { value: string; onChange:
   );
 }
 
+/** Renders a number input with an optional unit suffix. */
 function NumberAnswerInput({ value, onChange, unit }: { value: string; onChange: (v: string) => void; unit?: string }) {
   return (
     <div className="flex items-center gap-0">
@@ -296,6 +318,7 @@ function NumberAnswerInput({ value, onChange, unit }: { value: string; onChange:
   );
 }
 
+/** Renders a checkbox input with the question text as its label. */
 function CheckboxAnswerInput({ q, value, onChange }: { q: TQuestion; value: string | boolean; onChange: (v: boolean) => void }) {
   const checked = value === true || value === "checked" || value === "true";
   return (
@@ -307,6 +330,7 @@ function CheckboxAnswerInput({ q, value, onChange }: { q: TQuestion; value: stri
   );
 }
 
+/** Renders a date, time, or datetime-local input based on the include flags. */
 function DateTimeAnswerInput({ value, onChange, includeDate = true, includeTime = true }:
   { value: string; onChange: (v: string) => void; includeDate?: boolean; includeTime?: boolean }) {
   return (
@@ -317,67 +341,140 @@ function DateTimeAnswerInput({ value, onChange, includeDate = true, includeTime 
   );
 }
 
-function MediaAnswerInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+/** Shared file-picker button with a preview-and-confirm modal before uploading. */
+function UploadImageButton({
+  label = "Add media",
+  buttonClassName,
+  onAdd,
+}: {
+  label?: string;
+  buttonClassName?: string;
+  onAdd: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<{ file: File; localUrl: string } | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [previewLocal, setPreviewLocal] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    setPreviewLocal(URL.createObjectURL(f));
+    setPending({ file: f, localUrl: URL.createObjectURL(f) });
+    setError("");
+    e.target.value = "";
+  }
+
+  function cancel() {
+    if (pending) URL.revokeObjectURL(pending.localUrl);
+    setPending(null);
+    setError("");
+  }
+
+  async function confirm() {
+    if (!pending) return;
     setUploading(true);
+    setError("");
     try {
       const fd = new FormData();
-      fd.append("file", f);
+      fd.append("file", pending.file);
       fd.append("category", "Inspection Media");
       fd.append("folder", "media");
       fd.append("description", "Uploaded from inspection");
-
       const res = await fetch("/api/documents/upload", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("upload failed");
+      if (!res.ok) throw new Error("Upload failed — check your connection");
       const data = await res.json();
       const url = `/${data.file_path.replace(/\\/g, "/")}`;
-      onChange([...value, url]);
+      onAdd(url);
+      URL.revokeObjectURL(pending.localUrl);
+      setPending(null);
     } catch (err) {
-      // silently fail for now
+      setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
-      setPreviewLocal(null);
-      if (e.target) e.target.value = "";
     }
   }
 
   return (
-    <div>
-      <label className="inline-block">
-        <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-        <button className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          Add media
-        </button>
-      </label>
+    <>
+      <input ref={inputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileSelected} />
+      <button
+        onClick={() => inputRef.current?.click()}
+        className={buttonClassName}
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        {label}
+      </button>
 
-      {uploading && (
-        <div className="mt-2 text-sm text-gray-500">Uploading…</div>
-      )}
+      {pending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-gray-100 px-5 py-3.5">
+              <p className="font-semibold text-gray-800">Preview image</p>
+              <p className="mt-0.5 truncate text-xs text-gray-400">
+                {pending.file.name} · {(pending.file.size / 1024).toFixed(0)} KB
+              </p>
+            </div>
 
-      {previewLocal && (
-        <div className="mt-2">
-          <img src={previewLocal} alt="preview" className="h-28 w-28 rounded object-cover" />
+            <div className="flex min-h-48 items-center justify-center bg-gray-50 p-4">
+              {pending.file.type.startsWith("video/") ? (
+                <video src={pending.localUrl} controls className="max-h-64 max-w-full rounded-lg shadow-sm" />
+              ) : (
+                <img src={pending.localUrl} alt="preview" className="max-h-64 max-w-full rounded-lg object-contain shadow-sm" />
+              )}
+            </div>
+
+            {error && (
+              <div className="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-2.5 px-5 py-4">
+              <button
+                onClick={cancel}
+                disabled={uploading}
+                className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirm}
+                disabled={uploading}
+                className="flex-1 rounded-xl bg-brand-700 py-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+              >
+                {uploading ? "Uploading…" : "Add to inspection ✓"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
+    </>
+  );
+}
+
+/** Renders a media upload input with preview thumbnails for attached images. */
+function MediaAnswerInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <div>
+      <UploadImageButton
+        label="Add media"
+        buttonClassName="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+        onAdd={url => onChange([...value, url])}
+      />
 
       {value.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {value.map((url, i) => (
             <div key={i} className="relative">
               <a href={url} target="_blank" rel="noreferrer">
-                <img src={url} alt={`attachment-${i}`} className="h-20 w-20 rounded object-cover" />
+                <img src={url} alt={`attachment-${i}`} className="h-20 w-20 rounded-lg object-cover shadow-sm" />
               </a>
-              <button onClick={() => onChange(value.filter((_, j) => j !== i))}
-                className="absolute -top-2 -right-2 rounded-full bg-white p-1 text-red-500 shadow">
+              <button
+                onClick={() => onChange(value.filter((_, j) => j !== i))}
+                className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs text-red-500 shadow"
+              >
                 ✕
               </button>
             </div>
@@ -388,6 +485,7 @@ function MediaAnswerInput({ value, onChange }: { value: string[]; onChange: (v: 
   );
 }
 
+/** Renders a range slider input displaying the current numeric value between min and max. */
 function SliderAnswerInput({ q, value, onChange }: { q: TQuestion; value: string; onChange: (v: string) => void }) {
   const min = q.min ?? 1; const max = q.max ?? 10; const step = q.step ?? 1;
   const num = value !== "" ? Number(value) : min;
@@ -405,6 +503,7 @@ function SliderAnswerInput({ q, value, onChange }: { q: TQuestion; value: string
   );
 }
 
+/** Renders a placeholder button that opens an annotation tool. */
 function AnnotationInput() {
   return (
     <div className="flex justify-end">
@@ -416,6 +515,7 @@ function AnnotationInput() {
   );
 }
 
+/** Renders a name text input and an add-signature button for capturing a signature answer. */
 function SignatureAnswerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex gap-2">
@@ -430,6 +530,7 @@ function SignatureAnswerInput({ value, onChange }: { value: string; onChange: (v
   );
 }
 
+/** Renders a textarea and a button to populate it with the device's current GPS coordinates. */
 function LocationAnswerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex gap-2">
@@ -446,6 +547,7 @@ function LocationAnswerInput({ value, onChange }: { value: string; onChange: (v:
   );
 }
 
+/** Renders an editable table input with dynamic rows and column types defined by the question schema. */
 function TableAnswerInput({ q, value, onChange }: {
   q: TQuestion; value: Record<number, Record<string, string>>;
   onChange: (v: Record<number, Record<string, string>>) => void;
@@ -516,6 +618,7 @@ function TableAnswerInput({ q, value, onChange }: {
 
 // ── Question Card ─────────────────────────────────────────────────────────────
 
+/** Renders a single inspection question card with its input, flag indicators, note editor, and action controls. */
 function QuestionCard({ q, ans, noteOpen, onAnswer, onNote, onMedia, onToggleNote, onCreateAction, requireAction, requireEvidence }:
   {
     q: TQuestion; ans: AnswerState; noteOpen: boolean;
@@ -608,11 +711,11 @@ function QuestionCard({ q, ans, noteOpen, onAnswer, onNote, onMedia, onToggleNot
           {ans.note ? "Edit note" : "Add note"}
         </button>
         {q.type !== "media" && (
-          <button onClick={() => { const u = prompt("Enter media URL (demo):"); if (u) onMedia([...(ans.media_urls ?? []), u]); }}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-400 transition hover:bg-gray-50 hover:text-gray-600">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            Attach media
-          </button>
+          <UploadImageButton
+            label="Attach media"
+            buttonClassName="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
+            onAdd={url => onMedia([...(ans.media_urls ?? []), url])}
+          />
         )}
         <button onClick={onCreateAction}
           className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium text-gray-400 transition hover:bg-gray-50 hover:text-gray-600">
@@ -629,6 +732,7 @@ function QuestionCard({ q, ans, noteOpen, onAnswer, onNote, onMedia, onToggleNot
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
+/** Renders the full inspection conduct page, including section navigation, question cards, auto-save, and flagged item review before completion. */
 export default function InspectionConductPage({ user, onLogout: _onLogout }: Props) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -648,25 +752,70 @@ export default function InspectionConductPage({ user, onLogout: _onLogout }: Pro
 
   useEffect(() => {
     if (!id) return;
-    api<InspectionRecord>(`/api/inspections/${id}`).then(insp => {
-      setInspection(insp);
-      const existing: Record<string, AnswerState> = {};
-      for (const [k, v] of Object.entries(insp.answers ?? {})) existing[k] = v as AnswerState;
-      setAnswers(existing);
-    });
-    api<{ template: FormSchema; name: string; description: string }>(`/api/inspections/${id}/template`).then(res => {
-      setSchema(res.template);
-      setTemplateName(res.name);
-      setTemplateDescription(res.description ?? "");
-    });
+    // Load inspection record
+    (async () => {
+      try {
+        const insp = await api<InspectionRecord>(`/api/inspections/${id}`);
+        setInspection(insp);
+        const existing: Record<string, AnswerState> = {};
+        for (const [k, v] of Object.entries(insp.answers ?? {})) existing[k] = v as AnswerState;
+        setAnswers(existing);
+        saveLocalInspection({ ...insp, _offline: false } as unknown as LocalInspection).catch(() => null);
+      } catch {
+        const local = await getLocalInspection(id).catch(() => null);
+        if (local) {
+          setInspection(local as unknown as InspectionRecord);
+          const existing: Record<string, AnswerState> = {};
+          for (const [k, v] of Object.entries(local.answers ?? {})) existing[k] = v as AnswerState;
+          setAnswers(existing);
+        }
+      }
+    })();
+    // Load template schema
+    (async () => {
+      try {
+        const res = await api<{ template: FormSchema; name: string; description: string }>(
+          `/api/inspections/${id}/template`
+        );
+        setSchema(res.template);
+        setTemplateName(res.name);
+        setTemplateDescription(res.description ?? "");
+      } catch {
+        const local = await getLocalInspection(id).catch(() => null);
+        if (local) {
+          const tpl = await getCachedTemplate(local.template_id).catch(() => null);
+          if (tpl) {
+            setSchema(tpl.form_schema as FormSchema);
+            setTemplateName(tpl.name);
+            setTemplateDescription(tpl.description ?? "");
+          }
+        }
+      }
+    })();
   }, [id]);
 
   const saveAnswers = useCallback((current: Record<string, AnswerState>) => {
     if (!id) return;
-    api(`/api/inspections/${id}/answers`, {
-      method: "PATCH",
-      body: JSON.stringify({ answers: Object.fromEntries(Object.entries(current).map(([k, v]) => [k, { value: v.value, note: v.note, is_flagged: v.is_flagged, media_urls: v.media_urls }])) }),
-    }).then(() => setLastSaved(new Date())).catch(() => null);
+    // Always persist to IDB
+    getLocalInspection(id).then(local => {
+      if (local) {
+        const answeredCount = Object.values(current).filter(a => isAnswered(a)).length;
+        saveLocalInspection({
+          ...local,
+          answers: current as unknown as Record<string, unknown>,
+          answered_questions: answeredCount,
+        }).catch(() => null);
+      }
+    }).catch(() => null);
+    // Sync to server when online
+    if (navigator.onLine) {
+      api(`/api/inspections/${id}/answers`, {
+        method: "PATCH",
+        body: JSON.stringify({ answers: Object.fromEntries(Object.entries(current).map(([k, v]) => [k, { value: v.value, note: v.note, is_flagged: v.is_flagged, media_urls: v.media_urls }])) }),
+      }).then(() => setLastSaved(new Date())).catch(() => null);
+    } else {
+      setLastSaved(new Date());
+    }
   }, [id]);
 
   function setAnswer(qid: string, value: AnswerState["value"], q: TQuestion) {
@@ -714,6 +863,46 @@ export default function InspectionConductPage({ user, onLogout: _onLogout }: Pro
   async function confirmComplete(finalFlagged: FlaggedItem[]) {
     if (!id) return;
     setCompleting(true);
+
+    if (!navigator.onLine) {
+      const local = await getLocalInspection(id).catch(() => null);
+      if (local) {
+        // Calculate score client-side
+        let score = 100;
+        if (schema) {
+          let earned = 0; let maxPts = 0;
+          for (const section of schema.sections) {
+            for (const q of section.questions) {
+              if (q.type === "multiple_choice" && q.score_map) {
+                const vals = Object.values(q.score_map).filter((v): v is number => typeof v === "number");
+                const qMax = vals.length ? Math.max(...vals) : 0;
+                maxPts += qMax;
+                const ans = answers[q.id];
+                if (ans?.value != null) {
+                  const pts = q.score_map[String(ans.value)];
+                  if (typeof pts === "number") earned += pts;
+                }
+              }
+            }
+          }
+          score = maxPts > 0 ? Math.round((earned / maxPts) * 100) : 100;
+        }
+        await saveLocalInspection({
+          ...local,
+          status: "pending_approval",
+          completed_at: new Date().toISOString(),
+          score,
+          flagged_items: finalFlagged as unknown[],
+          answers: answers as unknown as Record<string, unknown>,
+          answered_questions: Object.values(answers).filter(a => isAnswered(a)).length,
+          _offline: true,
+        }).catch(() => null);
+      }
+      setCompleting(false);
+      navigate("/inspections");
+      return;
+    }
+
     try {
       await api(`/api/inspections/${id}/complete`, { method: "POST", body: JSON.stringify({ flagged_items: finalFlagged }) });
       navigate(`/inspections/report/${id}`);

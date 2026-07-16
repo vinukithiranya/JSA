@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.core.db import get_db
-from app.models.db_models import CredentialDB
+from app.repositories import credentials_repository as repo
 
 router = APIRouter()
 
 class CredentialIn(BaseModel):
+    """Schema for creating or updating a credential record."""
     user_id: str
     user_name: str = ""
     credential_type: str
@@ -21,20 +22,21 @@ class CredentialIn(BaseModel):
 
 @router.get("")
 def list_credentials(db: Session = Depends(get_db)):
-    return db.query(CredentialDB).order_by(CredentialDB.expiry_date.asc()).all()
+    """Return all credentials ordered by expiry date ascending."""
+    return repo.list_all(db)
 
 @router.post("")
 def create_credential(body: CredentialIn, db: Session = Depends(get_db)):
+    """Create and persist a new credential record."""
     data = body.model_dump()
     if data.get("issued_date"): data["issued_date"] = date.fromisoformat(data["issued_date"])
     if data.get("expiry_date"): data["expiry_date"] = date.fromisoformat(data["expiry_date"])
-    c = CredentialDB(id=f"crd-{uuid.uuid4().hex[:12]}", **data)
-    db.add(c); db.commit(); db.refresh(c)
-    return c
+    return repo.create(db, id=f"crd-{uuid.uuid4().hex[:12]}", **data)
 
 @router.put("/{cred_id}")
 def update_credential(cred_id: str, body: CredentialIn, db: Session = Depends(get_db)):
-    c = db.query(CredentialDB).filter(CredentialDB.id == cred_id).first()
+    """Update an existing credential record by ID."""
+    c = repo.get(db, cred_id)
     if not c: raise HTTPException(404, "Credential not found")
     data = body.model_dump()
     if data.get("issued_date"): data["issued_date"] = date.fromisoformat(data["issued_date"])
@@ -45,7 +47,8 @@ def update_credential(cred_id: str, body: CredentialIn, db: Session = Depends(ge
 
 @router.delete("/{cred_id}")
 def delete_credential(cred_id: str, db: Session = Depends(get_db)):
-    c = db.query(CredentialDB).filter(CredentialDB.id == cred_id).first()
+    """Delete a credential record by ID."""
+    c = repo.get(db, cred_id)
     if not c: raise HTTPException(404, "Credential not found")
-    db.delete(c); db.commit()
+    repo.delete(db, c); db.commit()
     return {"ok": True}

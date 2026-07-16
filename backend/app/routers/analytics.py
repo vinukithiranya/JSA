@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.core.db import get_db
-from app.models.db_models import JsaRecordDB, InspectionRecordDB, IssueDB, ActionDB
+from app.repositories import actions_repository, inspections_repository, issues_repository
 
 router = APIRouter()
 
 @router.get("/analytics/summary")
 def analytics_summary(db: Session = Depends(get_db)):
-    inspections = db.query(InspectionRecordDB).all()
-    issues = db.query(IssueDB).all()
-    actions = db.query(ActionDB).all()
+    """Return a high-level summary of inspections, issues, and actions."""
+    inspections = inspections_repository.list_all(db)
+    issues = issues_repository.list_all(db)
+    actions = actions_repository.list_all(db)
     completed_insp = [i for i in inspections if i.status == "completed"]
     open_issues = [i for i in issues if i.status == "open"]
     overdue_actions = []
@@ -31,7 +32,8 @@ def analytics_summary(db: Session = Depends(get_db)):
 
 @router.get("/analytics/inspections")
 def inspection_analytics(db: Session = Depends(get_db)):
-    records = db.query(InspectionRecordDB).all()
+    """Return inspection analytics broken down by status, template, score, and flagged rate."""
+    records = inspections_repository.list_all(db)
     by_status: dict = {}
     by_template: dict = {}
     scores = [r.score for r in records if r.score is not None]
@@ -48,7 +50,8 @@ def inspection_analytics(db: Session = Depends(get_db)):
 
 @router.get("/analytics/issues")
 def issue_analytics(db: Session = Depends(get_db)):
-    records = db.query(IssueDB).all()
+    """Return issue counts grouped by status, priority, and type."""
+    records = issues_repository.list_all(db)
     by_status: dict = {}
     by_priority: dict = {}
     by_type: dict = {}
@@ -60,9 +63,10 @@ def issue_analytics(db: Session = Depends(get_db)):
 
 @router.get("/analytics/actions")
 def action_analytics(db: Session = Depends(get_db)):
+    """Return action counts grouped by status and priority, including overdue count."""
     from datetime import date
     today = date.today()
-    records = db.query(ActionDB).all()
+    records = actions_repository.list_all(db)
     by_status: dict = {}
     by_priority: dict = {}
     overdue = 0
@@ -72,19 +76,3 @@ def action_analytics(db: Session = Depends(get_db)):
         if r.status not in ("complete", "cant_do") and r.due_date and r.due_date < today:
             overdue += 1
     return {"total": len(records), "by_status": by_status, "by_priority": by_priority, "overdue": overdue}
-
-@router.get("/jsa/analytics")
-def jsa_analytics(db: Session = Depends(get_db)):
-    records = db.query(JsaRecordDB).all()
-    counts: dict = {}; total_pre: dict = {}; total_post: dict = {}; occurrences: dict = {}
-    for r in records:
-        for h in (r.hazards or []):
-            hid = int(h.get("hazard_id"))
-            counts[hid] = counts.get(hid, 0) + 1
-            total_pre[hid] = total_pre.get(hid, 0) + int(h.get("pre_score", 0) or 0)
-            total_post[hid] = total_post.get(hid, 0) + int(h.get("post_score", 0) or 0)
-            occurrences[hid] = occurrences.get(hid, 0) + 1
-    analytics = {}
-    for hid, cnt in counts.items():
-        analytics[hid] = {"count": cnt, "avg_pre_score": total_pre.get(hid, 0) / occurrences.get(hid, 1), "avg_post_score": total_post.get(hid, 0) / occurrences.get(hid, 1)}
-    return {"total_jsas": len(records), "by_hazard": analytics}

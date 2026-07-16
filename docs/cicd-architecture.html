@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI/CD Architecture — North Intelligence</title>
+<link rel="stylesheet" href="../assets/docs.css">
+<style>
+  /* ── Diagram shared styles ─────────────────────────────────── */
+  .diagram {
+    margin: 20px 0 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .diagram-box {
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 16px 22px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    position: relative;
+  }
+  .diagram-box strong { color: var(--text-primary); }
+  .diagram-box code { font-size: 11px; }
+  .diagram-box .box-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  /* Connector arrows */
+  .diagram-arrow {
+    width: 2px;
+    height: 28px;
+    background: var(--border-light);
+    position: relative;
+  }
+  .diagram-arrow::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--border-light);
+  }
+  .diagram-arrow-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin: -4px 0;
+    text-align: center;
+  }
+
+  /* Horizontal row of boxes */
+  .diagram-row {
+    display: flex;
+    gap: 20px;
+    align-items: stretch;
+    justify-content: center;
+    width: 100%;
+  }
+  .diagram-row > .diagram-box { flex: 1; max-width: 420px; }
+
+  /* Fork connector: single line splits into two */
+  .diagram-fork {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    height: 36px;
+    width: 100%;
+    max-width: 860px;
+    position: relative;
+  }
+  .diagram-fork::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 2px;
+    height: 14px;
+    background: var(--border-light);
+  }
+  .diagram-fork::after {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: calc(25% + 10px);
+    right: calc(25% + 10px);
+    height: 2px;
+    background: var(--border-light);
+  }
+  .diagram-fork-leg {
+    position: absolute;
+    top: 14px;
+    width: 2px;
+    height: 22px;
+    background: var(--border-light);
+  }
+  .diagram-fork-leg::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--border-light);
+  }
+  .diagram-fork-leg.left  { left: calc(25% + 10px); }
+  .diagram-fork-leg.right { right: calc(25% + 10px); }
+
+  /* Color variants */
+  .box-azure {
+    background: rgba(59,130,246,0.06);
+    border-color: rgba(59,130,246,0.3);
+  }
+  .box-build {
+    background: rgba(168,85,247,0.06);
+    border-color: rgba(168,85,247,0.3);
+  }
+  .box-dev {
+    background: rgba(34,197,94,0.06);
+    border-color: rgba(34,197,94,0.3);
+  }
+  .box-prod {
+    background: rgba(251,191,36,0.06);
+    border-color: rgba(251,191,36,0.3);
+  }
+  .box-dev .box-label { color: var(--accent-green); }
+  .box-prod .box-label { color: var(--accent-amber); }
+  .box-build .box-label { color: var(--accent-purple); }
+  .box-azure .box-label { color: var(--accent-blue); }
+
+  /* Branch flow */
+  .branch-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 20px 0;
+    flex-wrap: wrap;
+  }
+  .branch-node {
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 10px 18px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    min-width: 130px;
+  }
+  .branch-node strong { display: block; color: var(--text-primary); font-size: 14px; margin-bottom: 2px; }
+  .branch-connector {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .branch-connector .arrow-line {
+    width: 30px;
+    height: 2px;
+    background: var(--border-light);
+    position: relative;
+  }
+  .branch-connector .arrow-line::after {
+    content: '';
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 6px solid var(--border-light);
+  }
+
+  /* Pipeline step list inside diagram box */
+  .step-list {
+    text-align: left;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+  }
+  .step-list li {
+    padding: 3px 0;
+    margin: 0;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .step-list li::before {
+    content: attr(data-n);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: rgba(100,116,139,0.15);
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .step-list li .step-target {
+    display: block;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(100,116,139,0.15);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* Approval badge */
+  .badge-approval {
+    display: inline-block;
+    background: var(--accent-amber-bg);
+    color: var(--accent-amber);
+    border: 1px solid rgba(251,191,36,0.25);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .badge-auto {
+    display: inline-block;
+    background: var(--accent-green-bg);
+    color: var(--accent-green);
+    border: 1px solid rgba(34,197,94,0.25);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  /* Workflow timeline */
+  .workflow-timeline {
+    position: relative;
+    padding-left: 32px;
+    margin: 20px 0;
+  }
+  .workflow-timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    background: var(--border);
+  }
+  .wf-step {
+    position: relative;
+    margin-bottom: 20px;
+  }
+  .wf-step:last-child { margin-bottom: 0; }
+  .wf-step::before {
+    content: attr(data-n);
+    position: absolute;
+    left: -32px;
+    top: 0;
+    width: 22px;
+    height: 22px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .wf-step .wf-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .wf-step .wf-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  .wf-step .wf-detail code {
+    font-size: 11px;
+  }
+  .wf-step.wf-pipeline::before {
+    border-color: rgba(34,197,94,0.5);
+    background: var(--accent-green-bg);
+    color: var(--accent-green);
+  }
+  .wf-step.wf-approval::before {
+    border-color: rgba(251,191,36,0.5);
+    background: var(--accent-amber-bg);
+    color: var(--accent-amber);
+  }
+</style>
+</head>
+<body>
+<div class="doc-container">
+  <div class="doc-header">
+    <div class="breadcrumb">
+      <a href="../index.html">Docs</a> <span class="sep">/</span> <a href="../index.html#guides">Guides</a> <span class="sep">/</span> CI/CD Architecture
+    </div>
+    <h1>CI/CD Architecture &mdash; DEV &amp; PROD Environments</h1>
+    <div class="meta">
+      <span class="tag tag-date">March 2026</span>
+      <span class="tag tag-current">Active</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- RESOURCE ARCHITECTURE                                      -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Resource Architecture</h2>
+
+    <div class="diagram">
+      <!-- Azure DevOps -->
+      <div class="diagram-box box-azure" style="width:100%;max-width:860px;">
+        <div class="box-label">Azure DevOps</div>
+        <strong>northsails.visualstudio.com / north-intelligence</strong>
+
+        <!-- Branch flow -->
+        <div class="branch-flow" style="margin-top:16px;">
+          <div class="branch-node" style="border-color:rgba(148,163,184,0.3);background:rgba(148,163,184,0.05);">
+            <strong>feature/*</strong>
+            branches
+          </div>
+          <div class="branch-connector">
+            PR
+            <div class="arrow-line"></div>
+          </div>
+          <div class="branch-node box-dev">
+            <strong>dev</strong>
+            branch
+          </div>
+          <div class="branch-connector">
+            PR
+            <div class="arrow-line"></div>
+          </div>
+          <div class="branch-node box-prod">
+            <strong>main</strong>
+            branch
+          </div>
+        </div>
+      </div>
+
+      <!-- Fork connector -->
+      <div class="diagram-fork">
+        <div class="diagram-fork-leg left"></div>
+        <div class="diagram-fork-leg right"></div>
+      </div>
+
+      <!-- Pipeline boxes -->
+      <div class="diagram-row">
+        <div class="diagram-box box-dev">
+          <div class="box-label">Pipeline &rarr; DEV</div>
+          <span class="badge-auto">AUTOMATIC</span><br>
+          <strong>Build + Deploy</strong><br>
+          <span style="font-size:12px;">Triggered on merge to <code>dev</code></span>
+        </div>
+        <div class="diagram-box box-prod">
+          <div class="box-label">Pipeline &rarr; PROD</div>
+          <span class="badge-approval">MANUAL APPROVAL</span><br>
+          <strong>Build + Deploy</strong><br>
+          <span style="font-size:12px;">Triggered on merge to <code>main</code></span>
+        </div>
+      </div>
+
+      <!-- Arrows down -->
+      <div class="diagram-row" style="gap:20px;">
+        <div style="flex:1;max-width:420px;display:flex;justify-content:center;"><div class="diagram-arrow"></div></div>
+        <div style="flex:1;max-width:420px;display:flex;justify-content:center;"><div class="diagram-arrow"></div></div>
+      </div>
+
+      <!-- Environment boxes -->
+      <div class="diagram-row">
+        <div class="diagram-box box-dev">
+          <div class="box-label">DEV Environment</div>
+          <strong>NorthIntelligenceDev</strong><br>
+          <code>NTG-Analytics-RG-Dev</code><br>
+          <span style="font-size:12px;">B1 (Basic) + Burstable B1ms</span>
+        </div>
+        <div class="diagram-box box-prod">
+          <div class="box-label">PROD Environment</div>
+          <strong>NorthIntelligence</strong><br>
+          <code>NTG-Analytics-RG-Prod</code><br>
+          <span style="font-size:12px;">P1v2 (Premium) + General Purpose D2s</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- ENVIRONMENT COMPARISON                                     -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Environment Comparison</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Resource</th>
+          <th>DEV</th>
+          <th>PROD</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Resource Group</strong></td>
+          <td><code>NTG-Analytics-RG-Dev</code></td>
+          <td><code>NTG-Analytics-RG-Prod</code></td>
+        </tr>
+        <tr>
+          <td><strong>App Service</strong></td>
+          <td><code>NorthIntelligenceDev</code></td>
+          <td><code>NorthIntelligence</code></td>
+        </tr>
+        <tr>
+          <td><strong>App Service Plan</strong></td>
+          <td>B1 (Basic)</td>
+          <td>P1v2 (Premium)</td>
+        </tr>
+        <tr>
+          <td><strong>URL</strong></td>
+          <td><a href="https://northintelligencedev.azurewebsites.net">northintelligencedev.azurewebsites.net</a></td>
+          <td><a href="https://northintelligence.azurewebsites.net">northintelligence.azurewebsites.net</a></td>
+        </tr>
+        <tr>
+          <td><strong>PostgreSQL Server</strong></td>
+          <td><code>northintelligence-db-dev</code></td>
+          <td><code>northintelligence-db</code></td>
+        </tr>
+        <tr>
+          <td><strong>PostgreSQL Tier</strong></td>
+          <td>Burstable B1ms</td>
+          <td>General Purpose D2s</td>
+        </tr>
+        <tr>
+          <td><strong>Database Name</strong></td>
+          <td><code>postgres</code></td>
+          <td><code>postgres</code></td>
+        </tr>
+        <tr>
+          <td><strong>Blob Container</strong></td>
+          <td><code>ntg-bi-reports</code></td>
+          <td><code>ntg-bi-reports</code></td>
+        </tr>
+        <tr>
+          <td><strong>Auth</strong></td>
+          <td>Azure Easy Auth (Microsoft)</td>
+          <td>Azure Easy Auth (Microsoft)</td>
+        </tr>
+        <tr>
+          <td><strong>Pipeline Trigger</strong></td>
+          <td>Push to <code>dev</code> (auto)</td>
+          <td>Push to <code>main</code> (manual approval)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- PIPELINE ARCHITECTURE                                      -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Azure DevOps Pipeline Architecture</h2>
+    <p>Defined in <code>azure-pipelines.yml</code> at the project root.</p>
+
+    <div class="diagram">
+      <!-- Stage 1: Build -->
+      <div class="diagram-box box-build" style="width:100%;max-width:860px;">
+        <div class="box-label">Stage 1: Build &amp; Package</div>
+        <p style="margin:4px 0 0;font-size:12px;color:var(--text-muted);">Runs for both <code>dev</code> and <code>main</code> branches</p>
+        <ul class="step-list">
+          <li data-n="1">Setup Node.js 20</li>
+          <li data-n="2"><code>npm ci</code> with cache</li>
+          <li data-n="3"><code>npm run build:deploy</code></li>
+          <li data-n="4">Copy <code>frontend/build</code> &rarr; <code>backend/static</code></li>
+          <li data-n="5">Verify <code>index.html</code> exists</li>
+          <li data-n="6">ZIP <code>backend/</code> folder</li>
+          <li data-n="7">Publish artifact</li>
+        </ul>
+      </div>
+
+      <!-- Fork connector -->
+      <div class="diagram-fork">
+        <div class="diagram-fork-leg left"></div>
+        <div class="diagram-fork-leg right"></div>
+      </div>
+
+      <!-- Stage 2 & 3 -->
+      <div class="diagram-row">
+        <div class="diagram-box box-dev">
+          <div class="box-label">Stage 2: Deploy DEV</div>
+          <span class="badge-auto">AUTOMATIC</span>
+          <p style="margin:4px 0 0;font-size:12px;color:var(--text-muted);">Condition: branch = <code>dev</code></p>
+          <ul class="step-list">
+            <li data-n="1">Setup Python 3.12</li>
+            <li data-n="2">Alembic migrate</li>
+            <li data-n="3">ZIP Deploy</li>
+            <li data-n="4">Health check</li>
+          </ul>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(34,197,94,0.15);font-size:11px;color:var(--text-muted);">
+            Target: <code>NorthIntelligenceDev</code><br>
+            RG: <code>NTG-Analytics-RG-Dev</code>
+          </div>
+        </div>
+
+        <div class="diagram-box box-prod">
+          <div class="box-label">Stage 3: Deploy PROD</div>
+          <span class="badge-approval">MANUAL APPROVAL</span>
+          <p style="margin:4px 0 0;font-size:12px;color:var(--text-muted);">Condition: branch = <code>main</code></p>
+          <ul class="step-list">
+            <li data-n="1">Setup Python 3.12</li>
+            <li data-n="2">Alembic migrate</li>
+            <li data-n="3">ZIP Deploy</li>
+            <li data-n="4">Health check</li>
+          </ul>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(251,191,36,0.15);font-size:11px;color:var(--text-muted);">
+            Target: <code>NorthIntelligence</code><br>
+            RG: <code>NTG-Analytics-RG-Prod</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- AZURE DEVOPS CONFIGURATION                                 -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Azure DevOps Configuration (One-Time Setup)</h2>
+
+    <h3>1. Service Connections</h3>
+    <p>Go to: <strong>Project Settings &rarr; Service connections &rarr; New service connection</strong></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Connection Name</th>
+          <th>Type</th>
+          <th>Scope</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>north-intelligence-azure-dev</code></td>
+          <td>Azure Resource Manager (auto SP)</td>
+          <td><code>NTG-Analytics-RG-Dev</code></td>
+        </tr>
+        <tr>
+          <td><code>north-intelligence-azure-prod</code></td>
+          <td>Azure Resource Manager (auto SP)</td>
+          <td><code>NTG-Analytics-RG-Prod</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>Steps:</strong></p>
+    <ol>
+      <li>Click "New service connection"</li>
+      <li>Select "Azure Resource Manager"</li>
+      <li>Choose "Service principal (automatic)"</li>
+      <li>Select your Azure subscription</li>
+      <li>Scope to the resource group</li>
+      <li>Name it as above</li>
+      <li>Check "Grant access permission to all pipelines"</li>
+    </ol>
+
+    <h3>2. Environments with Approval Gates</h3>
+    <p>Go to: <strong>Pipelines &rarr; Environments &rarr; New environment</strong></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Environment Name</th>
+          <th>Approval Required</th>
+          <th>Approvers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>north-intelligence-dev</code></td>
+          <td>No</td>
+          <td>&mdash;</td>
+        </tr>
+        <tr>
+          <td><code>north-intelligence-prod</code></td>
+          <td>Yes</td>
+          <td>Team lead / you</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>To add approval to PROD:</strong></p>
+    <ol>
+      <li>Open <code>north-intelligence-prod</code> environment</li>
+      <li>Click &#8942; (three dots) &rarr; "Approvals and checks"</li>
+      <li>Click "+" &rarr; "Approvals"</li>
+      <li>Add required approver(s)</li>
+      <li>Save</li>
+    </ol>
+
+    <h3>3. Variable Group (Secrets)</h3>
+    <p>Go to: <strong>Pipelines &rarr; Library &rarr; + Variable group</strong></p>
+    <p>Group name: <code>north-intelligence-secrets</code></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Variable Name</th>
+          <th>Value</th>
+          <th>Secret?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>DEV_POSTGRES_CONNECTION_STRING</code></td>
+          <td><code>postgresql://user:pass@northintelligence-db-dev:5432/postgres</code></td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td><code>PROD_POSTGRES_CONNECTION_STRING</code></td>
+          <td><code>postgresql://user:pass@northintelligence-db:5432/postgres</code></td>
+          <td>Yes</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>Steps:</strong></p>
+    <ol>
+      <li>Create the variable group</li>
+      <li>Add each variable, toggle the lock icon to mark as secret</li>
+      <li>Click "Pipeline permissions" &rarr; authorize the pipeline</li>
+    </ol>
+
+    <h3>4. Create the Pipeline</h3>
+    <p>Go to: <strong>Pipelines &rarr; New pipeline</strong></p>
+    <ol>
+      <li>Select <strong>"Azure Repos Git"</strong></li>
+      <li>Select <strong><code>north-intelligence</code></strong> repository</li>
+      <li>Select <strong>"Existing Azure Pipelines YAML file"</strong></li>
+      <li>Branch: <code>dev</code> (or your feature branch)</li>
+      <li>Path: <code>/azure-pipelines.yml</code></li>
+      <li>Click <strong>"Run"</strong> to validate</li>
+    </ol>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- APP SERVICE CONFIGURATION                                  -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>App Service Configuration (Already Set)</h2>
+    <p>These environment variables should already be configured in each App Service's <strong>Configuration &rarr; Application settings</strong>:</p>
+
+    <h3>DEV App Service (<code>NorthIntelligenceDev</code>)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Setting</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>POSTGRES_CONNECTION_STRING</code></td>
+          <td><code>postgresql://...@northintelligence-db-dev:5432/postgres</code></td>
+        </tr>
+        <tr>
+          <td><code>AZURE_STORAGE_CONNECTION_STRING</code></td>
+          <td><code>DefaultEndpointsProtocol=https;AccountName=...</code></td>
+        </tr>
+        <tr>
+          <td><code>AZURE_STORAGE_CONTAINER</code></td>
+          <td><code>ntg-bi-reports</code></td>
+        </tr>
+        <tr>
+          <td><code>STANDALONE_STORAGE_PATH</code></td>
+          <td><code>/home/standalone-dashboards</code></td>
+        </tr>
+        <tr>
+          <td><code>LLM_PROVIDER</code></td>
+          <td><code>azure_openai</code></td>
+        </tr>
+        <tr>
+          <td><code>AZURE_OPENAI_ENDPOINT</code></td>
+          <td><code>https://....openai.azure.com/</code></td>
+        </tr>
+        <tr>
+          <td><code>AZURE_OPENAI_KEY</code></td>
+          <td>(key)</td>
+        </tr>
+        <tr>
+          <td><code>AZURE_OPENAI_DEPLOYMENT</code></td>
+          <td><code>gpt-4.1</code></td>
+        </tr>
+        <tr>
+          <td><code>SHAREPOINT_TENANT_ID</code></td>
+          <td><code>fa1136a2-...</code></td>
+        </tr>
+        <tr>
+          <td><code>SHAREPOINT_CLIENT_ID</code></td>
+          <td><code>feee4a2e-...</code></td>
+        </tr>
+        <tr>
+          <td><code>SHAREPOINT_SITE_URL</code></td>
+          <td><code>https://northsailsgroup.sharepoint.com/sites/DataTeam</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>PROD App Service (<code>NorthIntelligence</code>)</h3>
+    <p>Same variables as DEV but with <strong>production values</strong> (prod DB server, prod keys, etc.)</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- GIT BRANCHING & DEPLOYMENT FLOW                            -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Git Branching &amp; Deployment Flow</h2>
+
+    <div class="workflow-timeline">
+      <div class="wf-step" data-n="1">
+        <div class="wf-title">Create feature branch from dev</div>
+        <p class="wf-detail"><code>git checkout -b feature/my-feature dev</code></p>
+      </div>
+
+      <div class="wf-step" data-n="2">
+        <div class="wf-title">Develop &amp; test locally</div>
+        <p class="wf-detail"><code>uvicorn main:app --reload</code></p>
+      </div>
+
+      <div class="wf-step" data-n="3">
+        <div class="wf-title">Push &amp; create PR to dev</div>
+        <p class="wf-detail"><code>git push -u origin feature/my-feature</code><br>Create PR in Azure DevOps</p>
+      </div>
+
+      <div class="wf-step wf-pipeline" data-n="4">
+        <div class="wf-title">PR approved &rarr; Merge to dev</div>
+        <p class="wf-detail">Pipeline triggers automatically<br>Build &rarr; Migrate DEV DB &rarr; Deploy to DEV</p>
+      </div>
+
+      <div class="wf-step" data-n="5">
+        <div class="wf-title">Verify on DEV</div>
+        <p class="wf-detail"><a href="https://northintelligencedev.azurewebsites.net">https://northintelligencedev.azurewebsites.net</a></p>
+      </div>
+
+      <div class="wf-step wf-approval" data-n="6">
+        <div class="wf-title">Create PR from dev &rarr; main (production release)</div>
+        <p class="wf-detail">PR reviewed &amp; approved &rarr; Merge to main<br>Pipeline triggers &rarr; Build<br>Pauses for <strong>manual approval</strong><br>Approver clicks "Approve" in Azure DevOps<br>Migrate PROD DB &rarr; Deploy to PROD</p>
+      </div>
+
+      <div class="wf-step" data-n="7">
+        <div class="wf-title">Verify on PROD</div>
+        <p class="wf-detail"><a href="https://northintelligence.azurewebsites.net">https://northintelligence.azurewebsites.net</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- DATABASE MIGRATION WORKFLOW                                -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Database Migration Workflow (Alembic)</h2>
+
+    <h3>Creating a new migration</h3>
+    <pre><code>cd backend
+
+# Create a migration file
+alembic revision -m "add_new_column_to_orders"
+
+# Edit the generated file in alembic/versions/
+# Write SQL in upgrade() and downgrade()</code></pre>
+
+    <h3>Example migration file</h3>
+    <pre><code>def upgrade() -> None:
+    op.execute("""
+        ALTER TABLE tracking_3d.shift_logs
+        ADD COLUMN notes TEXT;
+    """)
+
+def downgrade() -> None:
+    op.execute("""
+        ALTER TABLE tracking_3d.shift_logs
+        DROP COLUMN notes;
+    """)</code></pre>
+
+    <h3>Testing locally</h3>
+    <pre><code># Apply all pending migrations
+alembic upgrade head
+
+# Check current version
+alembic current
+
+# Rollback one migration
+alembic downgrade -1</code></pre>
+
+    <h3>How it works in the pipeline</h3>
+    <ol>
+      <li>Pipeline extracts the ZIP artifact</li>
+      <li>Checks if <code>alembic_version</code> table exists in the database</li>
+      <li><strong>First run:</strong> stamps the baseline (marks DB as "at revision 0001")</li>
+      <li><strong>Subsequent runs:</strong> runs <code>alembic upgrade head</code> (applies only new migrations)</li>
+      <li>Then deploys the app code</li>
+    </ol>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- ROLLBACK STRATEGY                                          -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Rollback Strategy</h2>
+
+    <h3>App rollback</h3>
+    <p>Re-run a previous successful pipeline build from Azure DevOps:</p>
+    <ol>
+      <li>Go to Pipelines &rarr; select the pipeline &rarr; Runs</li>
+      <li>Find the last successful run</li>
+      <li>Click "Re-run" &rarr; deploys the old artifact</li>
+    </ol>
+
+    <h3>DB rollback</h3>
+    <pre><code># Rollback last migration (run from pipeline agent or locally)
+alembic downgrade -1</code></pre>
+
+    <h3>Emergency: Azure Portal</h3>
+    <ol>
+      <li>Go to App Service &rarr; Deployment Center</li>
+      <li>Use "Redeploy" on a previous deployment</li>
+    </ol>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- KEY DESIGN DECISIONS                                       -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section>
+    <h2>Key Design Decisions</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Decision</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>npm ci</code> over <code>npm install</code></td>
+          <td>Deterministic install from lockfile, faster in CI</td>
+        </tr>
+        <tr>
+          <td><code>CI=false</code> in build step</td>
+          <td>CRA treats warnings as errors when <code>CI=true</code> (Azure DevOps default)</td>
+        </tr>
+        <tr>
+          <td><code>pr: none</code> in pipeline</td>
+          <td>Pipeline triggers on merge (push to branch), not on PR creation</td>
+        </tr>
+        <tr>
+          <td>Alembic runs before deploy</td>
+          <td>Ensures DB schema is ready before new code goes live</td>
+        </tr>
+        <tr>
+          <td>No secrets in YAML</td>
+          <td>DB connection strings stored in Azure DevOps variable groups (marked secret)</td>
+        </tr>
+        <tr>
+          <td>Startup keeps <code>pip install</code></td>
+          <td>Matches current behavior, simple and reliable</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="doc-footer">
+    North Intelligence Platform &mdash; CI/CD Architecture &mdash; March 2026
+  </div>
+</div>
+</body>
+</html>
