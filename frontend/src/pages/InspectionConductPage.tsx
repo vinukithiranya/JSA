@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import type { User } from "../types";
 import SignaturePad from "../components/SignaturePad";
+import CreateActionModal from "../components/CreateActionModal";
 import {
   getLocalInspection, saveLocalInspection,
   getCachedTemplate, type LocalInspection,
@@ -43,6 +44,7 @@ interface TQuestion {
   number_format?: "number" | "percentage" | "cost";
   include_date?: boolean; include_time?: boolean;
   doc_number_format?: string;
+  annotation_image?: string;
   logic_rules?: LogicRule[];
   nested_questions?: TQuestion[];
 }
@@ -250,14 +252,17 @@ function CompanyInput({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-/** Renders a textarea and map button for entering or capturing an inspection location. */
+/** Renders a textarea and a button to populate it with the device's current GPS coordinates for the inspection location. */
 function InspLocationInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex gap-2">
       <textarea value={value} onChange={e => onChange(e.target.value)}
         placeholder="Location" rows={2}
         className="flex-1 resize-none rounded-lg border border-brand-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-      <button className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+      <button onClick={() => {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(pos => onChange(`${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`));
+      }} className="flex shrink-0 items-center gap-1.5 self-start rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
         Map
       </button>
@@ -504,14 +509,155 @@ function SliderAnswerInput({ q, value, onChange }: { q: TQuestion; value: string
   );
 }
 
-/** Renders a placeholder button that opens an annotation tool. */
-function AnnotationInput() {
+/** Renders a modal with a canvas that draws the question's reference diagram as a background, letting the user mark areas of concern on top of it. */
+function AnnotationModal({ imageUrl, onSave, onClose }: { imageUrl: string; onSave: (v: string) => void; onClose: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawing = useRef(false);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const drawBackground = useCallback(() => {
+    const canvas = canvasRef.current;
+    const img = imgRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !img || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  }, []);
+
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      imgRef.current = img;
+      const maxWidth = 640;
+      const scale = Math.min(1, maxWidth / img.naturalWidth);
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+      }
+      setReady(true);
+    };
+    img.src = imageUrl;
+  }, [imageUrl]);
+
+  useEffect(() => { if (ready) drawBackground(); }, [ready, drawBackground]);
+
+  function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const point = "touches" in e ? e.touches[0] : e;
+    return { x: (point.clientX - rect.left) * scaleX, y: (point.clientY - rect.top) * scaleY };
+  }
+
+  function startDraw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    drawing.current = true;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const { x, y } = getPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  }
+
+  function draw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    if (!drawing.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const { x, y } = getPos(e, canvas);
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#dc2626";
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+
+  function stopDraw() { drawing.current = false; }
+
+  function save() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    onSave(canvas.toDataURL("image/png"));
+  }
+
   return (
-    <div className="flex justify-end">
-      <button className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-        Annotate
-      </button>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-display text-base font-semibold text-brand-900">Mark areas of concern</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={() => ready && drawBackground()}
+              className="rounded-lg border border-brand-200 px-3 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50">
+              Clear
+            </button>
+            <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+        <div className="relative overflow-hidden rounded-xl border-2 border-brand-300 bg-gray-50 shadow-inner">
+          {!ready && <div className="flex h-48 items-center justify-center text-sm text-gray-400">Loading diagram…</div>}
+          <canvas
+            ref={canvasRef}
+            className={`w-full touch-none cursor-crosshair ${ready ? "" : "hidden"}`}
+            style={{ display: ready ? "block" : "none" }}
+            onMouseDown={startDraw}
+            onMouseMove={draw}
+            onMouseUp={stopDraw}
+            onMouseLeave={stopDraw}
+            onTouchStart={startDraw}
+            onTouchMove={draw}
+            onTouchEnd={stopDraw}
+          />
+        </div>
+        <button type="button" onClick={save} disabled={!ready}
+          className="mt-3 w-full rounded-lg bg-brand-700 py-2 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-40">
+          Save annotation
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Renders an annotation answer input: a button that opens a canvas over the question's reference diagram, with a preview and re-annotate option. */
+function AnnotationInput({ q, value, onChange }: { q: TQuestion; value: string; onChange: (v: string) => void }) {
+  const [annotating, setAnnotating] = useState(false);
+
+  if (!q.annotation_image) {
+    return <p className="text-sm italic text-gray-400">No diagram was uploaded for this question — nothing to annotate.</p>;
+  }
+
+  return (
+    <div>
+      {value ? (
+        <div className="flex items-center gap-3 rounded-lg border border-brand-200 bg-white p-2">
+          <img src={value} alt="Annotated diagram" className="h-20 rounded border border-gray-100 object-contain" />
+          <button onClick={() => setAnnotating(true)}
+            className="ml-auto shrink-0 rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50">
+            Re-annotate
+          </button>
+        </div>
+      ) : (
+        <div className="flex justify-end">
+          <button onClick={() => setAnnotating(true)}
+            className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+            Annotate
+          </button>
+        </div>
+      )}
+      {annotating && (
+        <AnnotationModal
+          imageUrl={q.annotation_image}
+          onSave={dataUrl => { onChange(dataUrl); setAnnotating(false); }}
+          onClose={() => setAnnotating(false)} />
+      )}
     </div>
   );
 }
@@ -680,7 +826,7 @@ function QuestionCard({ q, ans, noteOpen, onAnswer, onNote, onMedia, onToggleNot
       case "datetime": return <DateTimeAnswerInput value={v} onChange={onAnswer} includeDate={q.include_date ?? true} includeTime={q.include_time ?? true} />;
       case "media": return <MediaAnswerInput value={ans.media_urls ?? []} onChange={onMedia} />;
       case "slider": return <SliderAnswerInput q={q} value={v} onChange={onAnswer} />;
-      case "annotation": return <AnnotationInput />;
+      case "annotation": return <AnnotationInput q={q} value={v} onChange={onAnswer} />;
       case "signature": return <SignatureAnswerInput value={v} onChange={onAnswer} />;
       case "location": return <LocationAnswerInput value={v} onChange={onAnswer} />;
       case "instruction": return null;
@@ -779,6 +925,7 @@ export default function InspectionConductPage({ user, onLogout: _onLogout }: Pro
   const [noteOpen, setNoteOpen] = useState<string | null>(null);
   const [showFlagged, setShowFlagged] = useState(false);
   const [showStartModal, setShowStartModal] = useState(true);
+  const [actionPrompt, setActionPrompt] = useState<{ title: string } | null>(null);
   const [completing, setCompleting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1151,7 +1298,7 @@ export default function InspectionConductPage({ user, onLogout: _onLogout }: Pro
                         onNote={v => setNote(q.id, v)}
                         onMedia={v => setMediaUrls(q.id, v)}
                         onToggleNote={() => setNoteOpen(noteOpen === q.id ? null : q.id)}
-                        onCreateAction={() => navigate(`/actions?prefill=${encodeURIComponent(`${q.text} — ${ans.value ?? ""}`)}`)}
+                        onCreateAction={() => setActionPrompt({ title: `${q.text} — ${ans.value ?? ""}` })}
                       />
                       {showNested && (
                         <div className={`space-y-3 ${depth === 0 ? "ml-6 border-l-2 border-brand-300 pl-4" : "ml-4 border-l border-brand-200 pl-3"}`}>
@@ -1251,6 +1398,15 @@ export default function InspectionConductPage({ user, onLogout: _onLogout }: Pro
             </div>
           </div>
         </div>
+      )}
+
+      {actionPrompt && (
+        <CreateActionModal
+          initial={{ title: actionPrompt.title, linked_jsa_id: id ?? "" }}
+          createdBy={user?.id ?? "u-tech"}
+          onClose={() => setActionPrompt(null)}
+          onCreated={() => setActionPrompt(null)}
+        />
       )}
     </div>
   );

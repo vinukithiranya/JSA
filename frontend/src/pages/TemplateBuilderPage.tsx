@@ -1160,6 +1160,31 @@ function CtrlButton({ label, onClick }: { label: string; onClick: () => void }) 
   );
 }
 
+/** Renders an upload control for the annotation question's reference diagram, with a thumbnail and remove option once an image is set. */
+function AnnotationImageControl({ image, onChange }: { image?: string; onChange: (url: string | undefined) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => { if (ev.target?.result) onChange(ev.target.result as string); };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  return (
+    <span className="flex items-center gap-2">
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      {image && <img src={image} alt="Diagram" className="h-6 w-6 rounded object-cover border border-gray-200" />}
+      <CtrlButton label={image ? "Change diagram" : "Upload image to annotate"} onClick={() => fileRef.current?.click()} />
+      {image && (
+        <button onClick={() => onChange(undefined)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+      )}
+    </span>
+  );
+}
+
 function ControlBar({ question, isTitlePage, onUpdate, onSetPanel }: {
   question: Question; isTitlePage: boolean;
   onUpdate: (q: Question) => void;
@@ -1275,7 +1300,8 @@ function ControlBar({ question, isTitlePage, onUpdate, onSetPanel }: {
   if (t === "annotation") {
     items.push(<Divider key="d-ann" />);
     items.push(
-      <span key="ann" className="text-sm text-gray-500 italic">Upload image to annotate</span>
+      <AnnotationImageControl key="ann" image={question.annotation_image}
+        onChange={url => onUpdate({ ...question, annotation_image: url })} />
     );
   }
 
