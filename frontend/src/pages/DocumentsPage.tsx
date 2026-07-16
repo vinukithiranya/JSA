@@ -31,7 +31,7 @@ export default function DocumentsPage({ user, onLogout }: Props) {
     formData.append("folder", folder);
     formData.append("description", "Uploaded from app");
 
-    await fetch("/api/documents/upload", {
+    await api("/api/documents/upload", {
       method: "POST",
       headers: authHeader(),
       body: formData,

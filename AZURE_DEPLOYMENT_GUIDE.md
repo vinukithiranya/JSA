@@ -166,14 +166,14 @@ docker push yourdockerhubusername/rigpro:latest
 
 ```powershell
 # Create the database server
-# IMPORTANT: Replace "<YOUR_SECURE_PASSWORD>" with your own strong password
+# IMPORTANT: Replace "MySecurePassword123!" with your own strong password
 # Write this password down — you will need it in Step 7
 az postgres flexible-server create `
   --resource-group rigpro-rg `
   --name rigpro-db-server `
   --location australiaeast `
   --admin-user rigpro `
-  --admin-password <YOUR_SECURE_PASSWORD> `
+  --admin-password MySecurePassword123! `
   --sku-name Standard_B1ms `
   --tier Burstable `
   --version 15 `
@@ -258,13 +258,13 @@ az webapp create `
 > The `--name rigpro-app` becomes your URL: `https://rigpro-app.azurewebsites.net`
 > If that name is taken, change it to something unique like `rigpro-northsails`.
 
-Set the database connection — replace `<YOUR_SECURE_PASSWORD>` with your password from Step 4:
+Set the database connection — replace `MySecurePassword123!` with your password from Step 4:
 
 ```powershell
 az webapp config appsettings set `
   --resource-group rigpro-rg `
   --name rigpro-app `
-  --settings DATABASE_URL="postgresql+psycopg2://rigpro:<YOUR_SECURE_PASSWORD>@rigpro-db-server.postgres.database.azure.com:5432/rigpro_jsa?sslmode=require"
+  --settings DATABASE_URL="postgresql+psycopg2://rigpro:MySecurePassword123!@rigpro-db-server.postgres.database.azure.com:5432/rigpro_jsa?sslmode=require"
 ```
 
 ---
