@@ -4,15 +4,18 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // VITE_BACKEND_URL is set in Docker env; defaults to localhost for local dev
 const backendUrl = process.env.VITE_BACKEND_URL ?? "http://localhost:8000";
+// VITE_BASE_URL differs by deploy target: "/JSA/" for GitHub Pages, "/" for the
+// Railway single-origin deploy where the backend serves the built frontend itself.
+const baseUrl = process.env.VITE_BASE_URL ?? "/";
 
 export default defineConfig({
-  base: "/JSA/",
+  base: baseUrl,
   plugins: [
     react(),
     VitePWA({
       registerType: "autoUpdate",
       workbox: {
-        navigateFallback: "/JSA/index.html",
+        navigateFallback: `${baseUrl}index.html`,
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
         runtimeCaching: [
@@ -33,10 +36,10 @@ export default defineConfig({
         theme_color: "#1e3a5f",
         background_color: "#ffffff",
         display: "standalone",
-        start_url: "/JSA/",
-        scope: "/JSA/",
+        start_url: baseUrl,
+        scope: baseUrl,
         icons: [
-          { src: "/JSA/favicon.svg", sizes: "any", type: "image/svg+xml" },
+          { src: `${baseUrl}favicon.svg`, sizes: "any", type: "image/svg+xml" },
         ],
       },
     }),
